@@ -1,5 +1,8 @@
+import { auth } from "@clerk/nextjs/server"
 import { redirect } from "next/navigation"
 
-export default function Home() {
-  redirect("/editor")
+export default async function Home() {
+  const { userId } = await auth()
+
+  redirect(userId ? "/editor" : "/sign-in")
 }

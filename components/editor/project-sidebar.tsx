@@ -22,7 +22,7 @@ function EmptyProjectsState({ message }: { message: string }) {
 export function ProjectSidebar({ isOpen, onClose }: ProjectSidebarProps) {
   return (
     <aside
-      aria-hidden={!isOpen}
+      inert={!isOpen}
       className={cn(
         "pointer-events-none fixed top-14 bottom-0 left-0 z-40 w-full max-w-sm p-4 transition-transform duration-200 ease-out",
         isOpen ? "translate-x-0" : "-translate-x-full"
