@@ -6,10 +6,11 @@ Update this file whenever the current phase, active feature, or implementation s
 
 - Feature 02: Editor Chrome Shell (completed)
 - Feature 03: Authentication and Clerk Integration (completed)
+- Feature 04: Project Dialogs and Editor Home (completed)
 
 ## Current Goal
 
-- Prepare for the next feature unit after auth integration completion.
+- Prepare for the next feature unit after project dialogs and editor home implementation.
 
 ## Completed
 
@@ -33,6 +34,12 @@ Update this file whenever the current phase, active feature, or implementation s
   - Added minimal auth pages at `app/sign-in/[[...sign-in]]/page.tsx` and `app/sign-up/[[...sign-up]]/page.tsx` with responsive two-panel layout (form-only on small screens).
   - Updated `app/page.tsx` to redirect authenticated users to `/editor` and unauthenticated users to `/sign-in`.
   - Added Clerk `UserButton` to the right section of `components/editor/editor-navbar.tsx` with default Clerk menu/profile flows.
+- `context/feature-specs/04-project-dialogs.md` implemented:
+  - Replaced the `/editor` center placeholder with a minimal home screen containing the specified heading, description, and `New Project` button wired to the create dialog.
+  - Added a dedicated project dialog state hook/provider at `components/editor/project-dialog-state.tsx` to manage dialog state, form state, loading state, and mock project data operations.
+  - Added Create, Rename, and Delete project dialogs using the existing dialog pattern, including live slug preview, rename prefill + autofocus + Enter submit behavior, and destructive delete confirmation.
+  - Updated `components/editor/project-sidebar.tsx` to render mock owned/shared project lists, wire sidebar actions (`create`, `rename`, `delete`), and show rename/delete actions only on owned projects.
+  - Added mobile sidebar backdrop scrim with outside-tap close behavior while preserving existing sidebar open/close mechanics.
 
 ## In Progress
 
@@ -40,7 +47,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Start the next feature unit after auth verification is complete.
+- Start the next feature unit after project dialogs/editor home verification is complete.
 
 ## Open Questions
 
@@ -60,3 +67,5 @@ Update this file whenever the current phase, active feature, or implementation s
 - Verification complete for auth unit: `npm run lint` and `npm run build` both pass after Clerk provider, proxy protection, auth routes, and navbar user menu integration.
 - UX fix: set `afterSignOutUrl="/sign-in"` on `UserButton` to avoid slow intermediate rendering after sign-out.
 - Compatibility fix: moved `afterSignOutUrl="/sign-in"` from `UserButton` to `ClerkProvider` because current `@clerk/nextjs` `UserButton` props do not expose `afterSignOutUrl`.
+- Feature 04 implementation note: project dialogs and sidebar actions currently use in-memory mock project data only, with no API calls or persistence by design.
+- Verification complete for Feature 04 unit: `npm run lint` and `npm run build` both pass after editor home, project dialogs, sidebar actions, and mobile scrim updates.
