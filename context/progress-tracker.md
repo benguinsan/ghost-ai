@@ -5,10 +5,11 @@ Update this file whenever the current phase, active feature, or implementation s
 ## Current Phase
 
 - Feature 02: Editor Chrome Shell (completed)
+- Feature 03: Authentication and Clerk Integration (completed)
 
 ## Current Goal
 
-- Prepare and start the next feature unit after editor chrome completion.
+- Prepare for the next feature unit after auth integration completion.
 
 ## Completed
 
@@ -26,6 +27,12 @@ Update this file whenever the current phase, active feature, or implementation s
   - Added `components/editor/dialog-pattern.tsx` as a reusable dialog scaffold supporting title, description, and footer actions using existing token-based styling.
   - Added `components/editor/editor-layout.tsx` and wired route-level layout usage under `app/editor/layout.tsx`.
   - Added `app/editor/page.tsx` as editor content placeholder and updated `app/page.tsx` to redirect to `/editor`.
+- `context/feature-specs/03-auth.md` implemented:
+  - Installed `@clerk/ui` and wrapped `app/layout.tsx` with `ClerkProvider` using Clerk `dark` theme (`@clerk/ui/themes`) plus CSS variable-based appearance overrides.
+  - Added root-level `proxy.ts` and protected routes by default while keeping auth routes public via configured sign-in/sign-up env URL values.
+  - Added minimal auth pages at `app/sign-in/[[...sign-in]]/page.tsx` and `app/sign-up/[[...sign-up]]/page.tsx` with responsive two-panel layout (form-only on small screens).
+  - Updated `app/page.tsx` to redirect authenticated users to `/editor` and unauthenticated users to `/sign-in`.
+  - Added Clerk `UserButton` to the right section of `components/editor/editor-navbar.tsx` with default Clerk menu/profile flows.
 
 ## In Progress
 
@@ -33,7 +40,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Start the next editor feature unit after 02 verification is complete.
+- Start the next feature unit after auth verification is complete.
 
 ## Open Questions
 
@@ -50,3 +57,6 @@ Update this file whenever the current phase, active feature, or implementation s
 - Verification complete for editor chrome unit: `npm run lint` and `npm run build` both pass.
 - Scope alignment update: replaced `editor-shell` with `editor-layout` to keep composition explicit as layout-based usage.
 - Route alignment update: `/editor` now uses a dedicated layout with editor chrome components.
+- Verification complete for auth unit: `npm run lint` and `npm run build` both pass after Clerk provider, proxy protection, auth routes, and navbar user menu integration.
+- UX fix: set `afterSignOutUrl="/sign-in"` on `UserButton` to avoid slow intermediate rendering after sign-out.
+- Compatibility fix: moved `afterSignOutUrl="/sign-in"` from `UserButton` to `ClerkProvider` because current `@clerk/nextjs` `UserButton` props do not expose `afterSignOutUrl`.
