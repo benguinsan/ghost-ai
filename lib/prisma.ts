@@ -13,32 +13,11 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 const createPrismaClient = () => {
-import { withAccelerate } from "@prisma/extension-accelerate";
-import { PrismaPg } from "@prisma/adapter-pg";
-
-import { PrismaClient } from "@/app/generated/prisma/client";
-
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required to initialize Prisma");
-}
-
-const globalForPrisma = globalThis as unknown as {
-  prisma: ReturnType<typeof createPrismaClient> | undefined;
-};
-
-const createPrismaClient = () => {
   if (databaseUrl.startsWith("prisma+postgres://")) {
     return new PrismaClient({
       accelerateUrl: databaseUrl,
-    }).$extends(withAccelerate());
+    });
   }
-
-  return new PrismaClient({
-    adapter: new PrismaPg(databaseUrl),
-  });
-};
 
   return new PrismaClient({
     adapter: new PrismaPg(databaseUrl),
