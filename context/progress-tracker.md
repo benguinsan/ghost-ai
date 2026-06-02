@@ -7,10 +7,11 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 02: Editor Chrome Shell (completed)
 - Feature 03: Authentication and Clerk Integration (completed)
 - Feature 04: Project Dialogs and Editor Home (completed)
+- Feature 05: Prisma Models, Client Singleton, and Initial Migration (completed)
 
 ## Current Goal
 
-- Prepare for the next feature unit after project dialogs and editor home implementation.
+- Prepare for the next feature unit after Prisma foundation implementation.
 
 ## Completed
 
@@ -40,14 +41,20 @@ Update this file whenever the current phase, active feature, or implementation s
   - Added Create, Rename, and Delete project dialogs using the existing dialog pattern, including live slug preview, rename prefill + autofocus + Enter submit behavior, and destructive delete confirmation.
   - Updated `components/editor/project-sidebar.tsx` to render mock owned/shared project lists, wire sidebar actions (`create`, `rename`, `delete`), and show rename/delete actions only on owned projects.
   - Added mobile sidebar backdrop scrim with outside-tap close behavior while preserving existing sidebar open/close mechanics.
+- `context/feature-specs/05-prisma.md` implemented:
+  - Added `prisma/models/project.prisma` with `ProjectStatus` enum (`DRAFT`, `ARCHIVED`) and `Project` model fields: Clerk owner ID, name, optional description, optional `canvasJsonPath`, timestamps, relation to collaborators, and indexes on owner and creation date.
+  - Added `ProjectCollaborator` model with required project relation (`onDelete: Cascade`), collaborator email, creation timestamp, unique constraint on `[projectId, email]`, and indexes on `email` and `[projectId, createdAt]`.
+  - Added `lib/prisma.ts` singleton client that branches by `DATABASE_URL`: `accelerateUrl` for `prisma+postgres://` and `PrismaPg` adapter for direct PostgreSQL URLs, with global caching in development.
+  - Created and applied first migration at `prisma/migrations/20260602145805_add_project_models/migration.sql`.
+  - Regenerated Prisma client output in `app/generated/prisma`.
 
 ## In Progress
 
-- Add active implementation item here when work starts.
+- No active implementation item.
 
 ## Next Up
 
-- Start the next feature unit after project dialogs/editor home verification is complete.
+- Start the next feature unit after Prisma persistence foundation verification.
 
 ## Open Questions
 
@@ -69,3 +76,5 @@ Update this file whenever the current phase, active feature, or implementation s
 - Compatibility fix: moved `afterSignOutUrl="/sign-in"` from `UserButton` to `ClerkProvider` because current `@clerk/nextjs` `UserButton` props do not expose `afterSignOutUrl`.
 - Feature 04 implementation note: project dialogs and sidebar actions currently use in-memory mock project data only, with no API calls or persistence by design.
 - Verification complete for Feature 04 unit: `npm run lint` and `npm run build` both pass after editor home, project dialogs, sidebar actions, and mobile scrim updates.
+- Feature 05 implementation note: migration was applied successfully against the configured PostgreSQL datasource and generated Prisma client types now include `Project` and `ProjectCollaborator`.
+- Verification complete for Feature 05 unit: `npx prisma migrate dev --name add_project_models`, `npx prisma generate`, and `npm run build` pass.
