@@ -8,10 +8,12 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 03: Authentication and Clerk Integration (completed)
 - Feature 04: Project Dialogs and Editor Home (completed)
 - Feature 05: Prisma Models, Client Singleton, and Initial Migration (completed)
+- Feature 06: Project APIs (completed)
+- Feature 07: Wire Editor Home to Project APIs (completed)
 
 ## Current Goal
 
-- Prepare for the next feature unit after Prisma foundation implementation.
+- Prepare for the next feature unit after editor home API wiring.
 
 ## Completed
 
@@ -47,6 +49,21 @@ Update this file whenever the current phase, active feature, or implementation s
   - Added `lib/prisma.ts` singleton client that branches by `DATABASE_URL`: `accelerateUrl` for `prisma+postgres://` and `PrismaPg` adapter for direct PostgreSQL URLs, with global caching in development.
   - Created and applied first migration at `prisma/migrations/20260602145805_add_project_models/migration.sql`.
   - Regenerated Prisma client output in `app/generated/prisma`.
+- `context/feature-specs/06-project-apis.md` implemented:
+  - Added `app/api/projects/route.ts` with `GET` and `POST` handlers to list and create owner-scoped projects for the authenticated Clerk user.
+  - Enforced explicit `401` responses for unauthenticated requests in both handlers.
+  - Implemented create behavior with input validation and default project name fallback to `Untitled Project` when name is omitted.
+  - Added `app/api/projects/[projectId]/route.ts` with `PATCH` and `DELETE` handlers for owner-only rename and delete operations.
+  - Enforced ownership checks for project mutations, returning `403` when the requester is not the owner (or the project is inaccessible to them).
+- `context/feature-specs/07-wire-editor-home.md` implemented:
+  - Added `lib/project-data.ts` helper and moved sidebar project loading to server rendering in `app/editor/layout.tsx`, fetching owned and shared lists for the authenticated user before hydrating editor chrome.
+  - Added `hooks/use-project-actions.ts` to centralize create, rename, and delete dialog state plus API-backed project mutations.
+  - Wired create flow to generate a slug-based room ID preview with unique suffix, call `POST /api/projects`, and navigate to `/editor/[projectId]` on success.
+  - Wired rename flow to prefill the current name, call `PATCH /api/projects/[projectId]`, and refresh server data on success.
+  - Wired delete flow to show the selected project name, call `DELETE /api/projects/[projectId]`, and redirect to `/editor` when deleting the active workspace route.
+  - Updated editor home to remain a server component by moving the create trigger into a dedicated client button component.
+  - Added `app/editor/[projectId]/page.tsx` so newly created projects resolve to a workspace route.
+  - Updated `POST /api/projects` to accept optional `roomId` and persist it as the project `id` to keep project IDs aligned with room IDs.
 
 ## In Progress
 
@@ -54,7 +71,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Start the next feature unit after Prisma persistence foundation verification.
+- Start the next feature unit after editor home wiring is verified against build and lint expectations.
 
 ## Open Questions
 
@@ -78,3 +95,8 @@ Update this file whenever the current phase, active feature, or implementation s
 - Verification complete for Feature 04 unit: `npm run lint` and `npm run build` both pass after editor home, project dialogs, sidebar actions, and mobile scrim updates.
 - Feature 05 implementation note: migration was applied successfully against the configured PostgreSQL datasource and generated Prisma client types now include `Project` and `ProjectCollaborator`.
 - Verification complete for Feature 05 unit: `npx prisma migrate dev --name add_project_models`, `npx prisma generate`, and `npm run build` pass.
+- Feature 06 implementation note: project API routes are backend-only and currently not wired into editor UI dialogs.
+- Feature 07 implementation note: sidebar project lists are server-fetched and dialogs now mutate persisted projects via API routes.
+- Verification complete for Feature 07 unit: `npm run build` passes after server-side project loading, API-backed dialog actions, and workspace route wiring.
+- Runtime stability fix: normalized direct PostgreSQL `DATABASE_URL` SSL aliases (`prefer` / `require` / `verify-ca`) to `sslmode=verify-full` in `lib/prisma.ts` to remove pg warning noise and keep current secure semantics.
+- Workspace access hardening: `app/editor/[projectId]/page.tsx` now verifies authenticated access via owner or collaborator email before rendering and returns `notFound()` for unauthorized/non-existent projects.

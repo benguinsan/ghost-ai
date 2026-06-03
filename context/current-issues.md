@@ -1,1 +1,0 @@
-When I Click button Sign-out from Clerk it take along time rendering. And It just normally when I reloaded the page

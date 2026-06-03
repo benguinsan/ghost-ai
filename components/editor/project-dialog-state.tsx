@@ -1,224 +1,18 @@
 "use client"
 
-import type { FormEvent, ReactNode } from "react"
-import { createContext, useContext, useMemo, useState } from "react"
+import type { ReactNode } from "react"
+import { createContext, useContext } from "react"
 
 import { EditorDialogPattern } from "@/components/editor/dialog-pattern"
+import { useProjectActions } from "@/hooks/use-project-actions"
+import type { ProjectListItem } from "@/types/project-list-item"
 import { Button } from "@/components/ui/button"
 import { Dialog } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 
-export interface ProjectListItem {
-  id: string
-  name: string
-  slug: string
-  isOwned: boolean
-}
+type ProjectActionsState = ReturnType<typeof useProjectActions>
 
-type ActiveDialog = "create" | "rename" | "delete" | null
-
-const INITIAL_OWNED_PROJECTS: ProjectListItem[] = [
-  {
-    id: "project-owned-1",
-    name: "Realtime Event Mesh",
-    slug: "realtime-event-mesh",
-    isOwned: true,
-  },
-  {
-    id: "project-owned-2",
-    name: "Internal Billing Platform",
-    slug: "internal-billing-platform",
-    isOwned: true,
-  },
-]
-
-const INITIAL_SHARED_PROJECTS: ProjectListItem[] = [
-  {
-    id: "project-shared-1",
-    name: "Analytics Data Lake",
-    slug: "analytics-data-lake",
-    isOwned: false,
-  },
-  {
-    id: "project-shared-2",
-    name: "Mobile Push Gateway",
-    slug: "mobile-push-gateway",
-    isOwned: false,
-  },
-]
-
-function slugifyProjectName(projectName: string) {
-  return projectName
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-}
-
-async function simulateRequestDelay() {
-  await new Promise((resolve) => setTimeout(resolve, 250))
-}
-
-interface UseProjectDialogStateResult {
-  activeDialog: ActiveDialog
-  isLoading: boolean
-  projectName: string
-  slugPreview: string
-  selectedProject: ProjectListItem | null
-  ownedProjects: ProjectListItem[]
-  sharedProjects: ProjectListItem[]
-  setProjectName: (value: string) => void
-  openCreateDialog: () => void
-  openRenameDialog: (projectId: string) => void
-  openDeleteDialog: (projectId: string) => void
-  closeDialog: () => void
-  submitCreateProject: (event: FormEvent<HTMLFormElement>) => Promise<void>
-  submitRenameProject: (event: FormEvent<HTMLFormElement>) => Promise<void>
-  submitDeleteProject: () => Promise<void>
-}
-
-function useProjectDialogState(): UseProjectDialogStateResult {
-  const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null)
-  const [projectName, setProjectName] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
-  const [ownedProjects, setOwnedProjects] = useState<ProjectListItem[]>(INITIAL_OWNED_PROJECTS)
-  const [sharedProjects] = useState<ProjectListItem[]>(INITIAL_SHARED_PROJECTS)
-
-  const selectedProject = useMemo(
-    () => ownedProjects.find((project) => project.id === selectedProjectId) ?? null,
-    [ownedProjects, selectedProjectId]
-  )
-
-  const slugPreview = useMemo(() => slugifyProjectName(projectName), [projectName])
-
-  const closeDialog = () => {
-    setActiveDialog(null)
-    setProjectName("")
-    setSelectedProjectId(null)
-  }
-
-  const openCreateDialog = () => {
-    setProjectName("")
-    setSelectedProjectId(null)
-    setActiveDialog("create")
-  }
-
-  const openRenameDialog = (projectId: string) => {
-    const project = ownedProjects.find((item) => item.id === projectId)
-
-    if (!project) {
-      return
-    }
-
-    setProjectName(project.name)
-    setSelectedProjectId(projectId)
-    setActiveDialog("rename")
-  }
-
-  const openDeleteDialog = (projectId: string) => {
-    const project = ownedProjects.find((item) => item.id === projectId)
-
-    if (!project) {
-      return
-    }
-
-    setProjectName("")
-    setSelectedProjectId(projectId)
-    setActiveDialog("delete")
-  }
-
-  const submitCreateProject = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    const trimmedName = projectName.trim()
-
-    if (!trimmedName || isLoading) {
-      return
-    }
-
-    setIsLoading(true)
-    await simulateRequestDelay()
-
-    setOwnedProjects((currentProjects) => [
-      {
-        id: `project-owned-${Date.now()}`,
-        name: trimmedName,
-        slug: slugifyProjectName(trimmedName),
-        isOwned: true,
-      },
-      ...currentProjects,
-    ])
-
-    setIsLoading(false)
-    closeDialog()
-  }
-
-  const submitRenameProject = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    const trimmedName = projectName.trim()
-
-    if (!trimmedName || !selectedProjectId || isLoading) {
-      return
-    }
-
-    setIsLoading(true)
-    await simulateRequestDelay()
-
-    setOwnedProjects((currentProjects) =>
-      currentProjects.map((project) =>
-        project.id === selectedProjectId
-          ? {
-              ...project,
-              name: trimmedName,
-              slug: slugifyProjectName(trimmedName),
-            }
-          : project
-      )
-    )
-
-    setIsLoading(false)
-    closeDialog()
-  }
-
-  const submitDeleteProject = async () => {
-    if (!selectedProjectId || isLoading) {
-      return
-    }
-
-    setIsLoading(true)
-    await simulateRequestDelay()
-
-    setOwnedProjects((currentProjects) =>
-      currentProjects.filter((project) => project.id !== selectedProjectId)
-    )
-
-    setIsLoading(false)
-    closeDialog()
-  }
-
-  return {
-    activeDialog,
-    isLoading,
-    projectName,
-    slugPreview,
-    selectedProject,
-    ownedProjects,
-    sharedProjects,
-    setProjectName,
-    openCreateDialog,
-    openRenameDialog,
-    openDeleteDialog,
-    closeDialog,
-    submitCreateProject,
-    submitRenameProject,
-    submitDeleteProject,
-  }
-}
-
-const ProjectDialogStateContext = createContext<UseProjectDialogStateResult | null>(null)
+const ProjectDialogStateContext = createContext<ProjectActionsState | null>(null)
 
 export function useProjectDialogs() {
   const context = useContext(ProjectDialogStateContext)
@@ -244,7 +38,7 @@ function ProjectDialogs() {
         open={state.activeDialog === "create"}
       >
         <EditorDialogPattern
-          description="Name your project. The slug preview updates as you type."
+          description="Name your project. The room ID preview updates as you type."
           footerActions={
             <>
               <Button disabled={state.isLoading} onClick={state.closeDialog} type="button" variant="ghost">
@@ -271,9 +65,9 @@ function ProjectDialogs() {
               />
             </label>
             <p className="text-xs text-copy-muted">
-              Slug preview:{" "}
+              Room ID preview:{" "}
               <span className="font-medium text-copy-secondary">
-                {state.slugPreview || "project-slug"}
+                {state.roomIdPreview}
               </span>
             </p>
           </form>
@@ -348,10 +142,19 @@ function ProjectDialogs() {
 
 interface ProjectDialogStateProviderProps {
   children: ReactNode
+  ownedProjects: ProjectListItem[]
+  sharedProjects: ProjectListItem[]
 }
 
-export function ProjectDialogStateProvider({ children }: ProjectDialogStateProviderProps) {
-  const state = useProjectDialogState()
+export function ProjectDialogStateProvider({
+  children,
+  ownedProjects,
+  sharedProjects,
+}: ProjectDialogStateProviderProps) {
+  const state = useProjectActions({
+    ownedProjects,
+    sharedProjects,
+  })
 
   return (
     <ProjectDialogStateContext.Provider value={state}>

@@ -2,10 +2,10 @@
 
 import { Pencil, Plus, Trash2, X } from "lucide-react"
 
-import type { ProjectListItem } from "@/components/editor/project-dialog-state"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+import type { ProjectListItem } from "@/types/project-list-item"
 
 interface ProjectSidebarProps {
   isOpen: boolean

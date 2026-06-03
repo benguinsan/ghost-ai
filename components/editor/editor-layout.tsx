@@ -9,16 +9,19 @@ import {
   useProjectDialogs,
 } from "@/components/editor/project-dialog-state"
 import { ProjectSidebar } from "@/components/editor/project-sidebar"
+import type { ProjectListItem } from "@/types/project-list-item"
 
 interface EditorLayoutProps {
   children: ReactNode
+  ownedProjects: ProjectListItem[]
+  sharedProjects: ProjectListItem[]
 }
 
-export function EditorLayout({ children }: EditorLayoutProps) {
+export function EditorLayout({ children, ownedProjects, sharedProjects }: EditorLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
 
   return (
-    <ProjectDialogStateProvider>
+    <ProjectDialogStateProvider ownedProjects={ownedProjects} sharedProjects={sharedProjects}>
       <EditorLayoutBody isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen}>
         {children}
       </EditorLayoutBody>
