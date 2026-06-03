@@ -99,3 +99,4 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 07 implementation note: sidebar project lists are server-fetched and dialogs now mutate persisted projects via API routes.
 - Verification complete for Feature 07 unit: `npm run build` passes after server-side project loading, API-backed dialog actions, and workspace route wiring.
 - Runtime stability fix: normalized direct PostgreSQL `DATABASE_URL` SSL aliases (`prefer` / `require` / `verify-ca`) to `sslmode=verify-full` in `lib/prisma.ts` to remove pg warning noise and keep current secure semantics.
+- Workspace access hardening: `app/editor/[projectId]/page.tsx` now verifies authenticated access via owner or collaborator email before rendering and returns `notFound()` for unauthorized/non-existent projects.
