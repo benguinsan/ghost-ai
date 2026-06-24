@@ -25,51 +25,59 @@ export async function getProjectSidebarData({
   userId,
   collaboratorEmails,
 }: ProjectDataInput): Promise<ProjectDataResult> {
-  const ownedProjects = await prisma.project.findMany({
-    where: {
-      ownerId: userId,
-    },
-    select: {
-      id: true,
-      name: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  })
-
-  if (!collaboratorEmails.length) {
-    return {
-      ownedProjects: ownedProjects.map((project) => mapProjectToListItem(project, true)),
-      sharedProjects: [],
-    }
-  }
-
-  const sharedProjects = await prisma.project.findMany({
-    where: {
-      ownerId: {
-        not: userId,
+  try {
+    const ownedProjects = await prisma.project.findMany({
+      where: {
+        ownerId: userId,
       },
-      collaborators: {
-        some: {
-          email: {
-            in: collaboratorEmails,
-            mode: "insensitive",
+      select: {
+        id: true,
+        name: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    })
+
+    if (!collaboratorEmails.length) {
+      return {
+        ownedProjects: ownedProjects.map((project) => mapProjectToListItem(project, true)),
+        sharedProjects: [],
+      }
+    }
+
+    const sharedProjects = await prisma.project.findMany({
+      where: {
+        ownerId: {
+          not: userId,
+        },
+        collaborators: {
+          some: {
+            email: {
+              in: collaboratorEmails,
+              mode: "insensitive",
+            },
           },
         },
       },
-    },
-    select: {
-      id: true,
-      name: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  })
+      select: {
+        id: true,
+        name: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    })
 
-  return {
-    ownedProjects: ownedProjects.map((project) => mapProjectToListItem(project, true)),
-    sharedProjects: sharedProjects.map((project) => mapProjectToListItem(project, false)),
+    return {
+      ownedProjects: ownedProjects.map((project) => mapProjectToListItem(project, true)),
+      sharedProjects: sharedProjects.map((project) => mapProjectToListItem(project, false)),
+    }
+  } catch (error) {
+    console.error("Failed to load project sidebar data.", error)
+    return {
+      ownedProjects: [],
+      sharedProjects: [],
+    }
   }
 }

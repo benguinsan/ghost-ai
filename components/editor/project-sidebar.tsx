@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { Pencil, Plus, Trash2, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,7 @@ interface ProjectSidebarProps {
   onClose: () => void
   ownedProjects: ProjectListItem[]
   sharedProjects: ProjectListItem[]
+  activeProjectId?: string | null
   onCreateProject: () => void
   onRenameProject: (projectId: string) => void
   onDeleteProject: (projectId: string) => void
@@ -28,6 +30,8 @@ function EmptyProjectsState({ message }: { message: string }) {
 interface ProjectListProps {
   projects: ProjectListItem[]
   emptyMessage: string
+  activeProjectId?: string | null
+  onNavigate: () => void
   onRenameProject: (projectId: string) => void
   onDeleteProject: (projectId: string) => void
 }
@@ -35,6 +39,8 @@ interface ProjectListProps {
 function ProjectList({
   projects,
   emptyMessage,
+  activeProjectId,
+  onNavigate,
   onRenameProject,
   onDeleteProject,
 }: ProjectListProps) {
@@ -46,13 +52,18 @@ function ProjectList({
     <ul className="space-y-2">
       {projects.map((project) => (
         <li
-          className="flex items-center justify-between gap-2 rounded-xl border border-surface-border bg-subtle px-3 py-2"
+          className={cn(
+            "flex items-center justify-between gap-2 rounded-xl border px-3 py-2",
+            project.id === activeProjectId
+              ? "border-brand bg-accent-dim"
+              : "border-surface-border bg-subtle"
+          )}
           key={project.id}
         >
-          <div className="min-w-0">
+          <Link className="min-w-0 flex-1" href={`/editor/${project.id}`} onClick={onNavigate}>
             <p className="truncate text-sm font-medium text-copy-primary">{project.name}</p>
             <p className="truncate text-xs text-copy-muted">{project.slug}</p>
-          </div>
+          </Link>
           {project.isOwned ? (
             <div className="flex items-center gap-1">
               <Button
@@ -86,6 +97,7 @@ export function ProjectSidebar({
   onClose,
   ownedProjects,
   sharedProjects,
+  activeProjectId,
   onCreateProject,
   onRenameProject,
   onDeleteProject,
@@ -132,7 +144,9 @@ export function ProjectSidebar({
               </TabsList>
               <TabsContent className="mt-3 h-[calc(100%-2.75rem)] overflow-y-auto" value="my-projects">
                 <ProjectList
+                  activeProjectId={activeProjectId}
                   emptyMessage="No projects yet. Create one to get started."
+                  onNavigate={onClose}
                   onDeleteProject={onDeleteProject}
                   onRenameProject={onRenameProject}
                   projects={ownedProjects}
@@ -140,7 +154,9 @@ export function ProjectSidebar({
               </TabsContent>
               <TabsContent className="mt-3 h-[calc(100%-2.75rem)] overflow-y-auto" value="shared">
                 <ProjectList
+                  activeProjectId={activeProjectId}
                   emptyMessage="No shared projects yet."
+                  onNavigate={onClose}
                   onDeleteProject={onDeleteProject}
                   onRenameProject={onRenameProject}
                   projects={sharedProjects}

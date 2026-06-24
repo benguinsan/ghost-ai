@@ -1,6 +1,6 @@
 "use client";
 
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Bot, PanelLeftClose, PanelLeftOpen, Share2 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 
 import { Button } from "@/components/ui/button";
@@ -8,13 +8,22 @@ import { Button } from "@/components/ui/button";
 interface EditorNavbarProps {
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
+  projectName?: string;
+  onShare?: () => void;
+  isAiSidebarOpen?: boolean;
+  onToggleAiSidebar?: () => void;
 }
 
 export function EditorNavbar({
   isSidebarOpen,
   onToggleSidebar,
+  projectName,
+  onShare,
+  isAiSidebarOpen = false,
+  onToggleAiSidebar,
 }: EditorNavbarProps) {
   const SidebarIcon = isSidebarOpen ? PanelLeftClose : PanelLeftOpen;
+  const showWorkspaceActions = Boolean(projectName);
 
   return (
     <header className="h-14 border-b border-surface-border bg-surface">
@@ -29,8 +38,24 @@ export function EditorNavbar({
             <SidebarIcon className="h-5 w-5" />
           </Button>
         </div>
-        <div className="flex flex-1 items-center justify-center" />
+        <div className="flex flex-1 items-center justify-center">
+          {projectName ? (
+            <p className="truncate px-3 text-sm font-medium text-copy-primary">{projectName}</p>
+          ) : null}
+        </div>
         <div className="flex flex-1 items-center justify-end">
+          {showWorkspaceActions ? (
+            <div className="mr-2 flex items-center gap-2">
+              <Button onClick={onShare} type="button" variant="outline">
+                <Share2 className="h-4 w-4" />
+                Share
+              </Button>
+              <Button onClick={onToggleAiSidebar} type="button" variant={isAiSidebarOpen ? "secondary" : "ghost"}>
+                <Bot className="h-4 w-4" />
+                AI
+              </Button>
+            </div>
+          ) : null}
           <UserButton
             appearance={{
               elements: {
