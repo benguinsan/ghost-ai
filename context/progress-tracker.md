@@ -10,10 +10,12 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 05: Prisma Models, Client Singleton, and Initial Migration (completed)
 - Feature 06: Project APIs (completed)
 - Feature 07: Wire Editor Home to Project APIs (completed)
+- Feature 08: Editor Workspace Shell (completed)
+- Feature 09: Share Dialog and Collaborator Management (completed)
 
 ## Current Goal
 
-- Prepare for the next feature unit after editor home API wiring.
+- Prepare for the next feature unit after share dialog and collaborator management implementation.
 
 ## Completed
 
@@ -58,12 +60,26 @@ Update this file whenever the current phase, active feature, or implementation s
 - `context/feature-specs/07-wire-editor-home.md` implemented:
   - Added `lib/project-data.ts` helper and moved sidebar project loading to server rendering in `app/editor/layout.tsx`, fetching owned and shared lists for the authenticated user before hydrating editor chrome.
   - Added `hooks/use-project-actions.ts` to centralize create, rename, and delete dialog state plus API-backed project mutations.
-  - Wired create flow to generate a slug-based room ID preview with unique suffix, call `POST /api/projects`, and navigate to `/editor/[projectId]` on success.
+  - Wired create flow to generate a slug-based room ID preview with unique suffix, call `POST /api/projects`, and navigate to `/editor/[roomId]` on success.
   - Wired rename flow to prefill the current name, call `PATCH /api/projects/[projectId]`, and refresh server data on success.
   - Wired delete flow to show the selected project name, call `DELETE /api/projects/[projectId]`, and redirect to `/editor` when deleting the active workspace route.
   - Updated editor home to remain a server component by moving the create trigger into a dedicated client button component.
-  - Added `app/editor/[projectId]/page.tsx` so newly created projects resolve to a workspace route.
+  - Added dynamic `/editor/[roomId]` workspace routing so newly created projects resolve to a workspace route.
   - Updated `POST /api/projects` to accept optional `roomId` and persist it as the project `id` to keep project IDs aligned with room IDs.
+- `context/feature-specs/08-editor-workspace-shell.md` implemented:
+  - Added `lib/project-access.ts` helpers to resolve current Clerk identity (`userId` + primary email) and fetch room access by owner/collaborator membership.
+  - Added `components/editor/access-denied.tsx` with lock icon, short message, and `/editor` return link.
+  - Replaced workspace route with `app/editor/[roomId]/page.tsx` as a server component that redirects unauthenticated users to `/sign-in` and renders `AccessDenied` for missing/unauthorized rooms.
+  - Updated editor chrome to show current project name in the navbar, add placeholder `Share` and AI toggle actions, and render a right AI sidebar placeholder panel.
+  - Updated `components/editor/project-sidebar.tsx` to navigate to `/editor/[roomId]` and highlight the active room in the sidebar lists.
+  - Kept central workspace content as a dark canvas placeholder with no Liveblocks/canvas/AI behavior.
+- `context/feature-specs/09-share-dialog.md` implemented:
+  - Added `app/api/projects/[projectId]/collaborators/route.ts` with `GET`, `POST`, and `DELETE` handlers for listing, inviting, and removing collaborators.
+  - Enforced project ownership server-side for invite/remove mutations while allowing owners and collaborators to read collaborator lists.
+  - Added `lib/clerk-users.ts` to enrich collaborator emails with Clerk Backend API profile data (display name and avatar URL), with email-only fallback when no Clerk user is found.
+  - Added `components/editor/share-dialog.tsx` with owner invite/remove controls, read-only collaborator mode, and collaborator list rendering with Clerk-derived names/avatars.
+  - Wired the workspace navbar `Share` button to open the dialog from `components/editor/editor-layout.tsx`.
+  - Added copy project link action with temporary `Copied!` feedback for owners.
 
 ## In Progress
 
@@ -71,7 +87,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Start the next feature unit after editor home wiring is verified against build and lint expectations.
+- Start the next feature unit after share dialog and collaborator flows are verified against build and runtime behavior.
 
 ## Open Questions
 
@@ -99,4 +115,9 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 07 implementation note: sidebar project lists are server-fetched and dialogs now mutate persisted projects via API routes.
 - Verification complete for Feature 07 unit: `npm run build` passes after server-side project loading, API-backed dialog actions, and workspace route wiring.
 - Runtime stability fix: normalized direct PostgreSQL `DATABASE_URL` SSL aliases (`prefer` / `require` / `verify-ca`) to `sslmode=verify-full` in `lib/prisma.ts` to remove pg warning noise and keep current secure semantics.
-- Workspace access hardening: `app/editor/[projectId]/page.tsx` now verifies authenticated access via owner or collaborator email before rendering and returns `notFound()` for unauthorized/non-existent projects.
+- Workspace access hardening: `/editor/[roomId]` now verifies authenticated access via owner or collaborator email before rendering.
+- Feature 08 implementation note: workspace route segment is now `[roomId]` and uses shared access helpers plus `AccessDenied` instead of `notFound()` for unauthorized/missing rooms.
+- Verification complete for Feature 08 unit: `npm run build` passes after access helper extraction, workspace route migration, navbar action placeholders, active-room sidebar highlighting, and AI sidebar placeholder shell.
+- Runtime resilience fix: wrapped Prisma reads in `lib/project-data.ts` and `lib/project-access.ts` with safe fallbacks so temporary upstream DB outages no longer crash editor route rendering.
+- Verification re-run after resilience fix: `npm run build` passes.
+- Verification complete for Feature 09 unit: `npm run build` passes after share dialog wiring, collaborator APIs, owner access controls, and Clerk profile enrichment.
