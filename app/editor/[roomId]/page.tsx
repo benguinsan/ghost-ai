@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 
 import { AccessDenied } from "@/components/editor/access-denied"
+import { CollaborativeCanvas } from "@/components/editor/collaborative-canvas"
 import { getAccessibleProjectByRoom, getCurrentProjectIdentity } from "@/lib/project-access"
 
 interface EditorWorkspacePageProps {
@@ -33,12 +34,7 @@ export default async function EditorWorkspacePage({ params }: EditorWorkspacePag
 
   return (
     <div className="flex min-w-0 flex-1 bg-base">
-      <div className="flex flex-1 items-center justify-center px-6 py-10">
-        <div className="w-full max-w-2xl rounded-2xl border border-surface-border bg-surface p-8 text-center">
-          <h1 className="text-2xl font-semibold text-copy-primary">Workspace Canvas</h1>
-          <p className="mt-2 text-copy-muted">Canvas area placeholder for {project.name}</p>
-        </div>
-      </div>
+      <CollaborativeCanvas roomId={project.id} />
     </div>
   )
 }
