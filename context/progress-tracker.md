@@ -12,10 +12,13 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 07: Wire Editor Home to Project APIs (completed)
 - Feature 08: Editor Workspace Shell (completed)
 - Feature 09: Share Dialog and Collaborator Management (completed)
+- Feature 10: Liveblocks Setup (completed)
+- Feature 11: Base Canvas (completed)
+- Feature 12: Shape Panel and Drag-to-Create Nodes (completed)
 
 ## Current Goal
 
-- Prepare for the next feature unit after share dialog and collaborator management implementation.
+- Prepare for the next feature unit after implementing shape drag-and-drop node creation.
 
 ## Completed
 
@@ -80,6 +83,24 @@ Update this file whenever the current phase, active feature, or implementation s
   - Added `components/editor/share-dialog.tsx` with owner invite/remove controls, read-only collaborator mode, and collaborator list rendering with Clerk-derived names/avatars.
   - Wired the workspace navbar `Share` button to open the dialog from `components/editor/editor-layout.tsx`.
   - Added copy project link action with temporary `Copied!` feedback for owners.
+- `context/feature-specs/10-liveblocks-setup.md` implemented:
+  - Updated `liveblocks.config.ts` to define Presence (`cursor`, `isThinking`) and UserMeta (`id`, `name`, `avatar`, `color`) types for Liveblocks.
+  - Added `lib/liveblocks.ts` with a cached Liveblocks node client getter and deterministic user ID to cursor color mapping from a fixed palette.
+  - Added `app/api/liveblocks-auth/route.ts` implementing `POST /api/liveblocks-auth` with Clerk authentication and project access verification via existing access helper.
+  - Liveblocks auth route now ensures the project room exists (`getOrCreateRoom`) and returns an authorized session token with user name, avatar, and generated cursor color metadata.
+  - Unauthorized project access in the auth route returns `403` as required.
+- `context/feature-specs/11-base-canvas.md` implemented:
+  - Kept `app/editor/[roomId]/page.tsx` as a server component and replaced the canvas placeholder with a client collaborative canvas wrapper.
+  - Added `components/editor/collaborative-canvas.tsx` to set up `LiveblocksProvider`, `RoomProvider`, initial presence, `ClientSideSuspense` loading fallback, and a connection error fallback boundary.
+  - Wired `useLiveblocksFlow` into `ReactFlow` with suspense enabled and empty initial nodes/edges as the collaborative baseline.
+  - Rendered base canvas behavior with `ConnectionMode.Loose`, `fitView`, `MiniMap`, and dot-pattern `Background`.
+  - Added shared canvas types in `types/canvas.ts`, including node data (`label`, `color`, `shape`) and custom node/edge type aliases (`canvasNode`, `canvasEdge`).
+- `context/feature-specs/12-shape-panel.md` implemented:
+  - Added a bottom-center floating pill toolbar in `components/editor/collaborative-canvas.tsx` with draggable shape icon buttons for rectangle, diamond, circle, pill, cylinder, and hexagon.
+  - Added shared defaults in `types/canvas.ts` for shape sizes (`NODE_SHAPE_DEFAULT_SIZES`) and default node color (`DEFAULT_CANVAS_NODE_COLOR`).
+  - Implemented drag payload serialization with shape and size, plus canvas `dragover` and `drop` handling to create nodes at `screenToFlowPosition` coordinates.
+  - New dropped nodes now use empty labels, default node color, dragged shape data, and `canvasNode` type with IDs formatted as `shape-timestamp-counter`.
+  - Added a basic custom `canvasNode` renderer so newly dropped nodes appear as simple bordered rectangles with centered labels.
 
 ## In Progress
 
@@ -87,7 +108,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Start the next feature unit after share dialog and collaborator flows are verified against build and runtime behavior.
+- Start the next feature unit after validating base canvas interactions and layering in canvas controls/custom rendering.
 
 ## Open Questions
 
@@ -121,3 +142,8 @@ Update this file whenever the current phase, active feature, or implementation s
 - Runtime resilience fix: wrapped Prisma reads in `lib/project-data.ts` and `lib/project-access.ts` with safe fallbacks so temporary upstream DB outages no longer crash editor route rendering.
 - Verification re-run after resilience fix: `npm run build` passes.
 - Verification complete for Feature 09 unit: `npm run build` passes after share dialog wiring, collaborator APIs, owner access controls, and Clerk profile enrichment.
+- Verification complete for Feature 10 unit: `npm run build` passes after Liveblocks typing, cached node client helper, deterministic cursor color utility, and auth route implementation.
+- Verification complete for Feature 11 unit: `npm run build` passes after Liveblocks room wrapper, React Flow sync wiring, shared canvas types, and base canvas rendering.
+- Liveblocks auth resilience fix: `lib/liveblocks.ts` now supports `LIVEBLOCKS_SECRET_KEY` and `LIVEBLOCKS_SECRET` aliases; `/api/liveblocks-auth` returns a clear configuration error with `503` instead of generic `500` when server credentials are missing.
+- Verification complete for Feature 12 unit: `npm run build` passes after shape toolbar drag payload wiring, drop-to-create node flow, default shape sizing constants, and base custom canvas node rendering.
+- Shape rendering refinement: `components/editor/collaborative-canvas.tsx` now renders shape-specific visuals for `rectangle`, `diamond`, `circle`, `pill`, `cylinder`, and `hexagon` instead of showing all dropped nodes as rectangles.
