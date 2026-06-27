@@ -15,10 +15,16 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 10: Liveblocks Setup (completed)
 - Feature 11: Base Canvas (completed)
 - Feature 12: Shape Panel and Drag-to-Create Nodes (completed)
+- Feature 13: Node Shape Rendering and Drag Preview (completed)
+- Feature 14: Node Resizing and Inline Label Editing (completed)
+- Feature 15: Selected Node Color Toolbar (completed)
+- Feature 16: Edge Behavior and Inline Labels (completed)
+- Feature 17: Canvas Ergonomics (completed)
+- Feature 18: Starter Template Library and Import Flow (completed)
 
 ## Current Goal
 
-- Prepare for the next feature unit after implementing shape drag-and-drop node creation.
+- Prepare for the next feature unit after completing starter template import support.
 
 ## Completed
 
@@ -101,6 +107,42 @@ Update this file whenever the current phase, active feature, or implementation s
   - Implemented drag payload serialization with shape and size, plus canvas `dragover` and `drop` handling to create nodes at `screenToFlowPosition` coordinates.
   - New dropped nodes now use empty labels, default node color, dragged shape data, and `canvasNode` type with IDs formatted as `shape-timestamp-counter`.
   - Added a basic custom `canvasNode` renderer so newly dropped nodes appear as simple bordered rectangles with centered labels.
+- `context/feature-specs/13-node-shape.md` implemented:
+  - Replaced placeholder node visuals with shape-specific rendering tied to node data for rectangle, pill, circle (CSS) and diamond, hexagon, cylinder (SVG).
+  - Ensured SVG-based shapes scale to node width/height and keep border treatment consistent with node state.
+  - Updated node borders to remain subtle at rest and brighter when selected.
+  - Added a drag ghost preview that follows cursor movement while dragging from the shape panel and uses the same shape and default size as drop creation.
+  - Hid the drag preview reliably on drop completion and drag cancellation without changing node creation behavior.
+- `context/feature-specs/14-node-editing.md` implemented:
+  - Added selected-node resize handles using React Flow `NodeResizer`, with dark-theme subtle handle styling and enforced minimum node dimensions.
+  - Kept resize updates connected to the collaborative node state flow through the existing `onNodesChange` wiring.
+  - Added inline node label editing by double-clicking the centered label area, with an in-place centered textarea overlay.
+  - Added empty-label placeholder text in the centered label position, while preserving layout stability during edit mode.
+  - Wired live label updates into the existing collaborative node sync path as users type, and close-edit behavior on blur or `Escape`.
+  - Prevented text editing interactions from triggering drag or pan via `nodrag`/`nopan`/`nowheel` interaction classes.
+- `context/feature-specs/15-node-color-toolbar.md` implemented:
+  - Added shared node color-pair constants in `types/canvas.ts` for predefined background and text combinations, including default pair exports for node creation fallback.
+  - Added a floating selected-node color toolbar above custom nodes in `components/editor/collaborative-canvas.tsx`, rendering one swatch per predefined color pair.
+  - Added clear active swatch styling plus tight text-color-based glow feedback on hover, while keeping toolbar interactions from triggering node drag or canvas pan.
+  - Wired swatch selection to collaborative `onNodesChange` replacement updates so both `data.color` and `data.textColor` update immediately with no server calls.
+  - Updated node label rendering/editing to honor per-node text color so selected theme pairs are reflected directly in node UI.
+- `context/feature-specs/16-edge-behavior.md` implemented:
+  - Updated node handles to all four sides with subtle white-dot styling, dark border treatment, and hover-only fade-in visibility.
+  - Added default edge connection behavior for new links with rounded light strokes, arrowheads, and `canvasEdge` custom edge type assignment.
+  - Added `canvasEdge` renderer in `components/editor/collaborative-canvas.tsx` using smooth right-angle routing plus wider interaction width for easier hover/click behavior without thicker visible strokes.
+  - Added inline edge label editing via `EdgeLabelRenderer` with midpoint coordinates from `getSmoothStepPath`, autosizing input behavior, and save-on blur/Enter/Escape interactions.
+  - Wired edge label persistence through collaborative edge replacement updates (`onEdgesChange`) so labels flow through the existing shared edge state path.
+- `context/feature-specs/17-canvas-ergonomics.md` implemented:
+  - Added a bottom-left floating canvas control bar in `components/editor/collaborative-canvas.tsx` with grouped zoom and history controls separated by a divider.
+  - Wired zoom out, fit view, and zoom in controls to the active React Flow instance with short animated viewport transitions.
+  - Wired undo and redo controls to Liveblocks room history and dimmed disabled states when no undo/redo actions are available.
+  - Removed the React Flow minimap from the canvas surface.
+  - Added `hooks/use-keyboard-shortcuts.ts` and wired it into the canvas to handle zoom and history shortcuts while skipping editable fields.
+- `context/feature-specs/18-starter-template.md` implemented:
+  - Added `components/editor/starter-templates.ts` with typed `CanvasTemplate` definitions and predefined microservices, CI/CD pipeline, and event-driven templates using shared canvas node/edge types and the existing node color palette.
+  - Added `components/editor/starter-templates-modal.tsx` with a dialog-based, scrollable template card grid and lightweight SVG diagram previews that compute preview bounds from template node positions and render edge center lines plus shape-aware node visuals.
+  - Added `Templates` navbar action in `components/editor/editor-navbar.tsx` and wired workspace-level open behavior from `components/editor/editor-layout.tsx`.
+  - Wired import handling in `components/editor/collaborative-canvas.tsx` to clear existing nodes/edges first, add selected template nodes/edges through the existing collaborative change handlers, and fit the canvas view after loading.
 
 ## In Progress
 
@@ -108,7 +150,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Start the next feature unit after validating base canvas interactions and layering in canvas controls/custom rendering.
+- Start the next feature unit after validating starter template import interactions in the editor workspace.
 
 ## Open Questions
 
@@ -147,3 +189,18 @@ Update this file whenever the current phase, active feature, or implementation s
 - Liveblocks auth resilience fix: `lib/liveblocks.ts` now supports `LIVEBLOCKS_SECRET_KEY` and `LIVEBLOCKS_SECRET` aliases; `/api/liveblocks-auth` returns a clear configuration error with `503` instead of generic `500` when server credentials are missing.
 - Verification complete for Feature 12 unit: `npm run build` passes after shape toolbar drag payload wiring, drop-to-create node flow, default shape sizing constants, and base custom canvas node rendering.
 - Shape rendering refinement: `components/editor/collaborative-canvas.tsx` now renders shape-specific visuals for `rectangle`, `diamond`, `circle`, `pill`, `cylinder`, and `hexagon` instead of showing all dropped nodes as rectangles.
+- Canvas resilience update: `CanvasConnectionErrorBoundary` now supports retrying via a fallback button and resets error state when the room reset key changes, so reconnect attempts can recover without a full page reload.
+- Verification complete for Feature 13 unit: `npm run build` passes after shape-specific node rendering polish, selected-border treatment, and cursor-following drag ghost preview behavior.
+- Node connectivity fix: `components/editor/collaborative-canvas.tsx` now adds visible-on-hover connection handles on all four sides of custom shape nodes so edges can be created from rendered shapes.
+- Verification complete for Feature 14 unit: `npm run build` passes after selected-node resize handles, minimum resize constraints, inline label editing, and collaborative label sync wiring.
+- Label editing stability fix: `components/editor/collaborative-canvas.tsx` now keeps node label update callbacks stable via `nodesRef`, preventing editor remount/focus loss so typing no longer stops after a single character.
+- Verification re-run after label editing stability fix: `npm run build` passes.
+- Feature 14 execution re-check: implementation remains aligned with `context/feature-specs/14-node-editing.md`, and `npm run build` passes.
+- Keyboard interaction fix: inline label textarea now stops key/pointer event propagation and treats `Enter` (without `Shift`) as submit-close, preventing React Flow keyboard handlers from stealing focus or resetting local edit state during Liveblocks-synced node updates.
+- Label editing UX adjustment: inline label textarea now allows `Enter` to insert a newline while keeping event propagation blocked from React Flow; edit mode still closes only on blur or `Escape`.
+- Multiline label visibility fix: inline label textarea now uses full-height multiline styling (instead of single-line clipping), and read mode preserves line breaks with `whitespace-pre-wrap` so `Enter` lines remain visible during and after editing.
+- Node drag restore fix: removed `nodrag` from the non-edit label overlay so pointer drag gestures on node content once again move existing canvas nodes, while edit-mode textarea still keeps drag/pan blocking.
+- Verification complete for Feature 15 unit: `npm run build` passes after selected-node floating color toolbar, predefined color swatches, collaborative color-pair updates, and node text-color rendering updates.
+- Verification complete for Feature 16 unit: `npm run build` passes after custom edge renderer wiring, arrowed edge defaults, improved edge hit-area behavior, and collaborative inline edge label editing.
+- Verification complete for Feature 17 unit: `npm run build` passes after floating zoom/history controls, React Flow zoom wiring, Liveblocks undo/redo integration, keyboard shortcuts, and minimap removal.
+- Verification complete for Feature 18 unit: `npm run build` passes after starter template library definitions, modal template previews, navbar import entry point, and replace-in-canvas import flow wiring.
