@@ -204,3 +204,4 @@ Update this file whenever the current phase, active feature, or implementation s
 - Verification complete for Feature 16 unit: `npm run build` passes after custom edge renderer wiring, arrowed edge defaults, improved edge hit-area behavior, and collaborative inline edge label editing.
 - Verification complete for Feature 17 unit: `npm run build` passes after floating zoom/history controls, React Flow zoom wiring, Liveblocks undo/redo integration, keyboard shortcuts, and minimap removal.
 - Verification complete for Feature 18 unit: `npm run build` passes after starter template library definitions, modal template previews, navbar import entry point, and replace-in-canvas import flow wiring.
+- Keyboard shortcut guard fix: `hooks/use-keyboard-shortcuts.ts` now skips repeated/default-prevented keydown events and only calls `preventDefault()` when zoom actions can run, reducing held-key repeat triggers and preserving prior-handled shortcut behavior.

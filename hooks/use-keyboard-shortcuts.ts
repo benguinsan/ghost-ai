@@ -27,6 +27,10 @@ function shouldSkipShortcutTarget(target: EventTarget | null) {
 export function useKeyboardShortcuts({ onRedo, onUndo, reactFlowInstance }: UseKeyboardShortcutsOptions) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat) {
+        return
+      }
+
       if (shouldSkipShortcutTarget(event.target)) {
         return
       }
@@ -35,14 +39,22 @@ export function useKeyboardShortcuts({ onRedo, onUndo, reactFlowInstance }: UseK
       const hasCommandModifier = event.metaKey || event.ctrlKey
 
       if (key === "=" || key === "+") {
+        if (!reactFlowInstance) {
+          return
+        }
+
         event.preventDefault()
-        reactFlowInstance?.zoomIn({ duration: 180 })
+        reactFlowInstance.zoomIn({ duration: 180 })
         return
       }
 
       if (key === "-") {
+        if (!reactFlowInstance) {
+          return
+        }
+
         event.preventDefault()
-        reactFlowInstance?.zoomOut({ duration: 180 })
+        reactFlowInstance.zoomOut({ duration: 180 })
         return
       }
 
