@@ -11,6 +11,7 @@ import {
 } from "@/components/editor/project-dialog-state"
 import { ProjectSidebar } from "@/components/editor/project-sidebar"
 import { ShareDialog } from "@/components/editor/share-dialog"
+import { OPEN_STARTER_TEMPLATES_EVENT } from "@/components/editor/starter-template-events"
 import type { ProjectListItem } from "@/types/project-list-item"
 
 interface EditorLayoutProps {
@@ -82,12 +83,16 @@ function EditorLayoutBody({
   setIsSidebarOpen,
 }: EditorLayoutBodyProps) {
   const dialogState = useProjectDialogs()
+  const handleOpenStarterTemplates = () => {
+    window.dispatchEvent(new CustomEvent(OPEN_STARTER_TEMPLATES_EVENT))
+  }
 
   return (
     <main className="relative flex min-h-screen flex-col bg-base">
       <EditorNavbar
         isSidebarOpen={isSidebarOpen}
         isAiSidebarOpen={isAiSidebarOpen}
+        onOpenStarterTemplates={handleOpenStarterTemplates}
         onShare={() => setIsShareDialogOpen(true)}
         onToggleAiSidebar={() => setIsAiSidebarOpen((previous) => !previous)}
         onToggleSidebar={() => setIsSidebarOpen((previous) => !previous)}
