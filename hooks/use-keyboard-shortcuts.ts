@@ -6,6 +6,7 @@ import type { ReactFlowInstance } from "@xyflow/react"
 import type { CanvasEdge, CanvasNode } from "@/types/canvas"
 
 interface UseKeyboardShortcutsOptions {
+  onDeleteSelection: () => void
   onRedo: () => void
   onUndo: () => void
   reactFlowInstance: ReactFlowInstance<CanvasNode, CanvasEdge> | null
@@ -24,10 +25,15 @@ function shouldSkipShortcutTarget(target: EventTarget | null) {
   return editableParent !== null
 }
 
-export function useKeyboardShortcuts({ onRedo, onUndo, reactFlowInstance }: UseKeyboardShortcutsOptions) {
+export function useKeyboardShortcuts({
+  onDeleteSelection,
+  onRedo,
+  onUndo,
+  reactFlowInstance,
+}: UseKeyboardShortcutsOptions) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat) {
+      if (event.repeat) {
         return
       }
 
@@ -36,6 +42,7 @@ export function useKeyboardShortcuts({ onRedo, onUndo, reactFlowInstance }: UseK
       }
 
       const key = event.key
+      const code = event.code
       const hasCommandModifier = event.metaKey || event.ctrlKey
 
       if (key === "=" || key === "+") {
@@ -55,6 +62,18 @@ export function useKeyboardShortcuts({ onRedo, onUndo, reactFlowInstance }: UseK
 
         event.preventDefault()
         reactFlowInstance.zoomOut({ duration: 180 })
+        return
+      }
+
+      if (
+        key === "Backspace" ||
+        key === "Delete" ||
+        key === "Del" ||
+        code === "Backspace" ||
+        code === "Delete"
+      ) {
+        event.preventDefault()
+        onDeleteSelection()
         return
       }
 
@@ -79,10 +98,10 @@ export function useKeyboardShortcuts({ onRedo, onUndo, reactFlowInstance }: UseK
       }
     }
 
-    window.addEventListener("keydown", handleKeyDown)
+    window.addEventListener("keydown", handleKeyDown, { capture: true })
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown)
+      window.removeEventListener("keydown", handleKeyDown, { capture: true })
     }
-  }, [onRedo, onUndo, reactFlowInstance])
+  }, [onDeleteSelection, onRedo, onUndo, reactFlowInstance])
 }

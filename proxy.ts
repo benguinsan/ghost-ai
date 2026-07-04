@@ -11,8 +11,13 @@ const signInRoute = process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL ?? process.env.CLE
 const signUpRoute = process.env.NEXT_PUBLIC_CLERK_SIGN_UP_URL ?? process.env.CLERK_SIGN_UP_URL ?? "/sign-up"
 
 const isPublicRoute = createRouteMatcher(["/", toPathPattern(signInRoute), toPathPattern(signUpRoute)])
+const isLiveblocksAuthRoute = createRouteMatcher(["/api/liveblocks-auth(.*)"])
 
 export default clerkMiddleware(async (auth, req) => {
+  if (isLiveblocksAuthRoute(req)) {
+    return
+  }
+
   if (!isPublicRoute(req)) {
     await auth.protect()
   }

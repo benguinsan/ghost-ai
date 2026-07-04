@@ -72,9 +72,6 @@ export async function POST(request: Request) {
 
   await liveblocks.getOrCreateRoom(project.id, {
     defaultAccesses: [],
-    usersAccesses: {
-      [userId]: ["room:write"],
-    },
   });
 
   const session = liveblocks.prepareSession(userId, {
