@@ -21,10 +21,12 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 16: Edge Behavior and Inline Labels (completed)
 - Feature 17: Canvas Ergonomics (completed)
 - Feature 18: Starter Template Library and Import Flow (completed)
+- Feature 19: Presence Avatars and Live Cursor Overlay (completed)
+- Feature 20: AI Sidebar Shell (completed)
 
 ## Current Goal
 
-- Prepare for the next feature unit after completing starter template import support.
+- Prepare for the next feature unit after completing the AI sidebar shell.
 
 ## Completed
 
@@ -143,6 +145,19 @@ Update this file whenever the current phase, active feature, or implementation s
   - Added `components/editor/starter-templates-modal.tsx` with a dialog-based, scrollable template card grid and lightweight SVG diagram previews that compute preview bounds from template node positions and render edge center lines plus shape-aware node visuals.
   - Added `Templates` navbar action in `components/editor/editor-navbar.tsx` and wired workspace-level open behavior from `components/editor/editor-layout.tsx`.
   - Wired import handling in `components/editor/collaborative-canvas.tsx` to clear existing nodes/edges first, add selected template nodes/edges through the existing collaborative change handlers, and fit the canvas view after loading.
+- `context/feature-specs/19-presence-avatars-cursor.md` implemented:
+  - Added a top-right presence overlay inside `components/editor/collaborative-canvas.tsx`, separate from navbar actions and scoped to canvas workspace rendering.
+  - Rendered collaborator-only avatar stack from Liveblocks others presence (excluding current Clerk user), capped at five avatars with `+N` overflow and initials fallback when profile photos are missing.
+  - Rendered current user via Clerk `UserButton` in the same overlay and only show the divider when collaborators are present.
+  - Added Liveblocks cursor broadcasting via React Flow mouse events (`onMouseMove` and `onMouseLeave`) and rendered remote participant cursors with color-matched badges.
+  - Updated shared presence type naming from `isThinking` to `thinking` in `liveblocks.config.ts` and room initial presence.
+- `context/feature-specs/20-ai-sidebar-shell.md` implemented:
+  - Added `components/editor/ai-sidebar.tsx` as a dedicated floating sidebar component with parent-controlled `isOpen` and `onClose` behavior.
+  - Preserved right-side slide-in animation, floating placement, border, backdrop blur, and dark surface styling for the AI panel shell.
+  - Added AI Workspace header with bot icon, subtitle, and close control, plus shadcn `Tabs` for `AI Architect` and `Specs`.
+  - Built AI Architect UI shell with scrollable chat area, empty state, starter prompt chips, styled user/assistant message bubbles, auto-resizing textarea, and Enter-to-send behavior (`Shift+Enter` newline).
+  - Built Specs tab shell with `Generate Spec` action and a static demo spec card with disabled download button.
+  - Wired `components/editor/editor-layout.tsx` to render the new `AiSidebar` component instead of inline placeholder markup.
 
 ## In Progress
 
@@ -150,7 +165,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Start the next feature unit after validating starter template import interactions in the editor workspace.
+- Start the next feature unit after AI sidebar shell completion.
 
 ## Open Questions
 
@@ -205,3 +220,24 @@ Update this file whenever the current phase, active feature, or implementation s
 - Verification complete for Feature 17 unit: `npm run build` passes after floating zoom/history controls, React Flow zoom wiring, Liveblocks undo/redo integration, keyboard shortcuts, and minimap removal.
 - Verification complete for Feature 18 unit: `npm run build` passes after starter template library definitions, modal template previews, navbar import entry point, and replace-in-canvas import flow wiring.
 - Keyboard shortcut guard fix: `hooks/use-keyboard-shortcuts.ts` now skips repeated/default-prevented keydown events and only calls `preventDefault()` when zoom actions can run, reducing held-key repeat triggers and preserving prior-handled shortcut behavior.
+- Verification complete for Feature 19 unit: `npm run build` passes after collaborator avatar overlay, current-user Clerk button split rendering, Liveblocks cursor broadcasting on React Flow mouse events, and remote cursor badge rendering.
+- Live cursor visibility fix: switched cursor presence broadcasting from generic React Flow mouse handlers to pane-specific handlers (`onPaneMouseMove` / `onPaneMouseLeave`) so remote cursors publish reliably while users interact on the canvas surface.
+- Live cursor follow-up fix: added wrapper-level cursor broadcasting (`onMouseMove` / `onMouseLeave` on the canvas container) so presence keeps updating during node/object interactions where pane-only events may not fire consistently.
+- Live cursor robustness fix: added a window-level `pointermove` fallback scoped to canvas bounds while the pointer is inside the canvas, ensuring cursor presence still streams during pointer-capture drag interactions.
+- Verification complete for Feature 20 unit: `npm run build` passes after extracting the AI sidebar into a dedicated component, adding AI Architect/Specs tab shells, and wiring the editor layout to the new sidebar component.
+- Canvas deletion fix: `hooks/use-keyboard-shortcuts.ts` now handles `Backspace`/`Delete` and dispatches selection deletion, while `components/editor/collaborative-canvas.tsx` removes selected nodes and selected/connected edges through collaborative change handlers.
+- Canvas deletion follow-up: selection lookup now reads from `reactFlowInstance.getNodes()` / `getEdges()` (with Liveblocks refs fallback) so delete shortcuts remove the actively selected elements even when selection flags are not reflected in shared node/edge arrays.
+- Canvas deletion keyboard-event follow-up: shortcut listener now runs in window capture phase and matches both `event.key` and `event.code` for delete/backspace so node deletion still works when downstream handlers stop propagation in bubbling phase.
+- Canvas deletion reliability update: React Flow `onSelectionChange` now tracks selected node/edge IDs in refs, and delete shortcut uses that tracked selection (plus connected edges) to mirror undo-style shortcut handling while reliably removing currently selected elements.
+- Canvas deletion macOS follow-up: delete shortcut now uses `reactFlowInstance.deleteElements()` for selected nodes/edges when instance is available, aligning removal with React Flow native selection lifecycle and improving Delete-key behavior on macOS.
+- Canvas deletion debugging note: added development-only console logs for delete shortcut key events, selection updates, and delete handler execution paths to diagnose macOS Delete-key behavior in runtime.
+- Canvas deletion focus fallback: when no selected IDs are present in React Flow state, delete handler now resolves focused `.react-flow__node` / `.react-flow__edge` from `document.activeElement` and deletes that element, covering Backspace-on-focused-node behavior on macOS.
+- Canvas deletion Liveblocks-control fix: replaced `reactFlowInstance.deleteElements()` mutation path with explicit `onNodesChange` / `onEdgesChange` remove events using resolved selected IDs, keeping deletion aligned with controlled React Flow + Liveblocks synchronization.
+- Canvas deletion Liveblocks API alignment: wired `onDelete` from `useLiveblocksFlow` into `ReactFlow` and updated delete shortcut dispatch to call `onDelete({ nodes, edges })` with resolved selected elements so removal goes through the collaboration adapter’s native deletion path.
+- Deletion incident documentation: added `context/delete-key-fix-postmortem.md` explaining why intermediate fixes failed and why Liveblocks `onDelete` integration resolved macOS `Delete`/`Backspace` behavior.
+- Live cursor visibility follow-up: removed same-`userId` filtering in remote cursor mapping so concurrent sessions from the same Clerk account can still render each other’s cursor in realtime (useful for multi-tab/local testing).
+- Liveblocks multi-account access follow-up: updated `app/api/liveblocks-auth/route.ts` to stop writing per-request single-user `usersAccesses` in `getOrCreateRoom`, preventing room ACL churn across concurrent users and keeping presence/cursor visibility stable for multiple accounts in the same room.
+- Cursor publishing stability follow-up: removed pane-level mouse cursor handlers from `ReactFlow` and kept wrapper-level tracking plus window `pointermove` fallback, preventing premature `cursor: null` resets when pointer moves across node/overlay elements.
+- Realtime cursor diagnostics: added development-only debug logs in `components/editor/collaborative-canvas.tsx` (others summary + cursor publish sampling) and `app/api/liveblocks-auth/route.ts` (auth request/room-ready/authorized checkpoints) to isolate multi-user cursor visibility failures.
+- Liveblocks auth route hardening: exempted `/api/liveblocks-auth` from global Clerk middleware protection in `proxy.ts` so unauthenticated/expired sessions receive structured JSON (`401/403`) from the route handler instead of HTML sign-in redirects, reducing websocket auth parsing failures during cursor presence troubleshooting.
+- Diagnostics cleanup: removed temporary `ghost-debug` console logs from cursor/deletion client logic and Liveblocks auth route after troubleshooting to keep runtime output clean.

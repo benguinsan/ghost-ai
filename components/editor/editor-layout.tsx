@@ -4,6 +4,7 @@ import type { ReactNode } from "react"
 import { useState } from "react"
 import { usePathname } from "next/navigation"
 
+import { AiSidebar } from "@/components/editor/ai-sidebar"
 import { EditorNavbar } from "@/components/editor/editor-navbar"
 import {
   ProjectDialogStateProvider,
@@ -110,20 +111,8 @@ function EditorLayoutBody({
       />
       <section className="flex flex-1">
         <div className="flex min-w-0 flex-1">{children}</div>
-        {activeProjectId ? (
-          <aside
-            className={
-              isAiSidebarOpen
-                ? "hidden w-80 shrink-0 border-l border-surface-border bg-elevated/95 p-4 md:block"
-                : "hidden"
-            }
-          >
-            <div className="flex h-full items-center justify-center rounded-2xl border border-surface-border bg-subtle p-4 text-center text-sm text-copy-muted">
-              AI sidebar placeholder
-            </div>
-          </aside>
-        ) : null}
       </section>
+      {activeProjectId ? <AiSidebar isOpen={isAiSidebarOpen} onClose={() => setIsAiSidebarOpen(false)} /> : null}
       {activeProjectId && projectName ? (
         <ShareDialog
           isOpen={isShareDialogOpen}

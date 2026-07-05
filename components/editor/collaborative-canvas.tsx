@@ -6,6 +6,8 @@ import {
   Component,
   type ErrorInfo,
   type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type RefObject,
   type ReactNode,
   useCallback,
   useEffect,
@@ -13,8 +15,9 @@ import {
   useRef,
   useState,
 } from "react"
+import { UserButton, useAuth } from "@clerk/nextjs"
 import { ClientSideSuspense, LiveblocksProvider, RoomProvider } from "@liveblocks/react/suspense"
-import { useCanRedo, useCanUndo, useHistory } from "@liveblocks/react/suspense"
+import { useCanRedo, useCanUndo, useHistory, useMyPresence, useOthers } from "@liveblocks/react/suspense"
 import { useLiveblocksFlow } from "@liveblocks/react-flow"
 import {
   Circle,
@@ -91,6 +94,7 @@ const EDGE_STROKE_COLOR = "#e2e8f0"
 const EDGE_STROKE_REST_OPACITY = 0.72
 const EDGE_STROKE_ACTIVE_OPACITY = 1
 const EDGE_LABEL_HINT = "Double-click to add label"
+const MAX_VISIBLE_COLLABORATORS = 5
 
 interface ShapeDragPayload {
   shape: CanvasNodeShape
@@ -101,6 +105,23 @@ interface ShapeToolbarItem {
   shape: CanvasNodeShape
   label: string
   icon: typeof RectangleHorizontal
+}
+
+interface CollaboratorPresence {
+  avatar: string | null
+  color: string | null
+  id: string
+  name: string
+}
+
+interface RemoteCursor {
+  color: string
+  id: number | string
+  name: string
+  position: {
+    x: number
+    y: number
+  }
 }
 
 const SHAPE_TOOLBAR_ITEMS: ShapeToolbarItem[] = [
@@ -116,7 +137,7 @@ export function CollaborativeCanvas({ roomId }: CollaborativeCanvasProps) {
   return (
     <div className="flex min-w-0 flex-1">
       <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
-        <RoomProvider id={roomId} initialPresence={{ cursor: null, isThinking: false }}>
+        <RoomProvider id={roomId} initialPresence={{ cursor: null, thinking: false }}>
           <CanvasConnectionErrorBoundary resetKey={roomId}>
             <ClientSideSuspense fallback={<CanvasLoadingState />}>
               <LiveblocksReactFlowCanvas />
@@ -189,7 +210,7 @@ function CanvasLoadingState() {
 }
 
 function LiveblocksReactFlowCanvas() {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect } = useLiveblocksFlow({
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onDelete } = useLiveblocksFlow({
     suspense: true,
     nodes: {
       initial: INITIAL_NODES,
@@ -201,6 +222,9 @@ function LiveblocksReactFlowCanvas() {
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<CanvasNode, CanvasEdge> | null>(
     null,
   )
+  const { userId } = useAuth()
+  const others = useOthers()
+  const [, updateMyPresence] = useMyPresence()
   const history = useHistory()
   const canUndo = useCanUndo()
   const canRedo = useCanRedo()
@@ -211,9 +235,53 @@ function LiveblocksReactFlowCanvas() {
   } | null>(null)
   const [isStarterTemplatesOpen, setIsStarterTemplatesOpen] = useState(false)
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null)
+  const isPointerInsideCanvasRef = useRef(false)
   const nodeCreateCounterRef = useRef(0)
   const nodesRef = useRef(nodes)
   const edgesRef = useRef(edges)
+  const selectedNodeIdsRef = useRef<Set<string>>(new Set())
+  const selectedEdgeIdsRef = useRef<Set<string>>(new Set())
+
+  const collaborators = useMemo<CollaboratorPresence[]>(() => {
+    const mappedCollaborators = new Map<string, CollaboratorPresence>()
+    for (const other of others) {
+      if (!other.id || other.id === userId || mappedCollaborators.has(other.id)) {
+        continue
+      }
+
+      mappedCollaborators.set(other.id, {
+        avatar: other.info.avatar || null,
+        color: other.info.color || null,
+        id: other.id,
+        name: other.info.name || "Collaborator",
+      })
+    }
+
+    return Array.from(mappedCollaborators.values())
+  }, [others])
+
+  const remoteCursors = useMemo<RemoteCursor[]>(() => {
+    return others.reduce<RemoteCursor[]>((mappedCursors, other) => {
+      if (!other.presence.cursor) {
+        return mappedCursors
+      }
+
+      mappedCursors.push({
+        color: other.info.color || "var(--accent-primary)",
+        id: other.connectionId,
+        name: other.info.name || "Collaborator",
+        position: other.presence.cursor,
+      })
+
+      return mappedCursors
+    }, [])
+  }, [others])
+
+  const visibleCollaborators = useMemo(
+    () => collaborators.slice(0, MAX_VISIBLE_COLLABORATORS),
+    [collaborators],
+  )
+  const overflowCollaboratorCount = Math.max(0, collaborators.length - MAX_VISIBLE_COLLABORATORS)
 
   useEffect(() => {
     nodesRef.current = nodes
@@ -501,6 +569,82 @@ function LiveblocksReactFlowCanvas() {
     history.redo()
   }, [history])
 
+  const handleSelectionChange = useCallback((params: { nodes: CanvasNode[]; edges: CanvasEdge[] }) => {
+    selectedNodeIdsRef.current = new Set(params.nodes.map((node) => node.id))
+    selectedEdgeIdsRef.current = new Set(params.edges.map((edge) => edge.id))
+  }, [])
+
+  const handleDeleteSelection = useCallback(() => {
+    let resolvedNodeIds = new Set<string>()
+    let resolvedEdgeIds = new Set<string>()
+    const flowNodes = reactFlowInstance?.getNodes() ?? nodesRef.current
+    const flowEdges = reactFlowInstance?.getEdges() ?? edgesRef.current
+
+    if (reactFlowInstance) {
+      const selectedNodes = reactFlowInstance.getNodes().filter((node) => node.selected)
+      const selectedEdges = reactFlowInstance.getEdges().filter((edge) => edge.selected)
+      let resolvedNodes = selectedNodes
+      let resolvedEdges = selectedEdges
+
+      if (!resolvedNodes.length && !resolvedEdges.length) {
+        const activeElement = document.activeElement
+        if (activeElement instanceof HTMLElement) {
+          const focusedNode = activeElement.closest<HTMLElement>(".react-flow__node[data-id]")
+          const focusedEdge = activeElement.closest<HTMLElement>(".react-flow__edge[data-id]")
+
+          if (focusedNode?.dataset.id) {
+            const focusedNodeMatch = reactFlowInstance
+              .getNodes()
+              .find((node) => node.id === focusedNode.dataset.id)
+            if (focusedNodeMatch) {
+              resolvedNodes = [focusedNodeMatch]
+            }
+          }
+
+          if (focusedEdge?.dataset.id) {
+            const focusedEdgeMatch = reactFlowInstance
+              .getEdges()
+              .find((edge) => edge.id === focusedEdge.dataset.id)
+            if (focusedEdgeMatch) {
+              resolvedEdges = [focusedEdgeMatch]
+            }
+          }
+        }
+      }
+
+      if (!resolvedNodes.length && !resolvedEdges.length) {
+        return
+      }
+      resolvedNodeIds = new Set(resolvedNodes.map((node) => node.id))
+      resolvedEdgeIds = new Set(resolvedEdges.map((edge) => edge.id))
+    } else {
+      resolvedNodeIds = new Set(selectedNodeIdsRef.current)
+      resolvedEdgeIds = new Set(selectedEdgeIdsRef.current)
+
+      if (!resolvedNodeIds.size && !resolvedEdgeIds.size) {
+        return
+      }
+    }
+
+    for (const edge of flowEdges) {
+      if (resolvedNodeIds.has(edge.source) || resolvedNodeIds.has(edge.target)) {
+        resolvedEdgeIds.add(edge.id)
+      }
+    }
+
+    const resolvedNodes = flowNodes.filter((node) => resolvedNodeIds.has(node.id))
+    const resolvedEdges = flowEdges.filter((edge) => resolvedEdgeIds.has(edge.id))
+
+    if (!resolvedNodes.length && !resolvedEdges.length) {
+      return
+    }
+
+    onDelete({
+      edges: resolvedEdges,
+      nodes: resolvedNodes,
+    })
+  }, [onDelete, reactFlowInstance])
+
   const handleImportTemplate = useCallback(
     (template: CanvasTemplate) => {
       const currentEdges = edgesRef.current
@@ -544,10 +688,76 @@ function LiveblocksReactFlowCanvas() {
   )
 
   useKeyboardShortcuts({
+    onDeleteSelection: handleDeleteSelection,
     onRedo: handleRedo,
     onUndo: handleUndo,
     reactFlowInstance,
   })
+
+  const publishCursorPosition = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!reactFlowInstance) {
+        return
+      }
+
+      const pointerPosition = reactFlowInstance.screenToFlowPosition({
+        x: clientX,
+        y: clientY,
+      })
+      updateMyPresence({ cursor: pointerPosition })
+    },
+    [reactFlowInstance, updateMyPresence],
+  )
+
+  const handleCanvasSurfaceMouseMove = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      isPointerInsideCanvasRef.current = true
+      publishCursorPosition(event.clientX, event.clientY)
+    },
+    [publishCursorPosition],
+  )
+
+  const handleCanvasMouseEnter = useCallback(() => {
+    isPointerInsideCanvasRef.current = true
+  }, [])
+
+  const handleCanvasPaneMouseLeave = useCallback(() => {
+    isPointerInsideCanvasRef.current = false
+    updateMyPresence({ cursor: null })
+  }, [updateMyPresence])
+
+  useEffect(() => {
+    const handleWindowPointerMove = (event: PointerEvent) => {
+      if (!isPointerInsideCanvasRef.current) {
+        return
+      }
+
+      const wrapperBounds = canvasWrapperRef.current?.getBoundingClientRect()
+      if (!wrapperBounds) {
+        return
+      }
+
+      const isInsideCanvas =
+        event.clientX >= wrapperBounds.left &&
+        event.clientX <= wrapperBounds.right &&
+        event.clientY >= wrapperBounds.top &&
+        event.clientY <= wrapperBounds.bottom
+
+      if (!isInsideCanvas) {
+        isPointerInsideCanvasRef.current = false
+        updateMyPresence({ cursor: null })
+        return
+      }
+
+      publishCursorPosition(event.clientX, event.clientY)
+    }
+
+    window.addEventListener("pointermove", handleWindowPointerMove)
+
+    return () => {
+      window.removeEventListener("pointermove", handleWindowPointerMove)
+    }
+  }, [publishCursorPosition, updateMyPresence])
 
   return (
     <div
@@ -555,6 +765,9 @@ function LiveblocksReactFlowCanvas() {
       className="relative h-full min-h-0 w-full"
       onDragOver={handleCanvasDragOver}
       onDrop={handleCanvasDrop}
+      onMouseEnter={handleCanvasMouseEnter}
+      onMouseLeave={handleCanvasPaneMouseLeave}
+      onMouseMove={handleCanvasSurfaceMouseMove}
     >
       <ReactFlow
         connectionMode={ConnectionMode.Loose}
@@ -566,12 +779,19 @@ function LiveblocksReactFlowCanvas() {
         nodeTypes={nodeTypes}
         onConnect={onConnect}
         onEdgesChange={onEdgesChange}
+        onDelete={onDelete}
         onInit={setReactFlowInstance}
+        onSelectionChange={handleSelectionChange}
         onNodesChange={onNodesChange}
       >
         <Background variant={BackgroundVariant.Dots} />
       </ReactFlow>
 
+      <CanvasPresenceBar
+        collaborators={visibleCollaborators}
+        overflowCollaboratorCount={overflowCollaboratorCount}
+      />
+      <LiveCursorLayer canvasWrapperRef={canvasWrapperRef} cursors={remoteCursors} reactFlowInstance={reactFlowInstance} />
       <CanvasControlBar
         canRedo={canRedo}
         canUndo={canUndo}
@@ -608,6 +828,137 @@ interface CanvasControlBarProps {
   onUndo: () => void
   onZoomIn: () => void
   onZoomOut: () => void
+}
+
+interface CanvasPresenceBarProps {
+  collaborators: CollaboratorPresence[]
+  overflowCollaboratorCount: number
+}
+
+function CanvasPresenceBar({ collaborators, overflowCollaboratorCount }: CanvasPresenceBarProps) {
+  const hasCollaborators = collaborators.length > 0 || overflowCollaboratorCount > 0
+
+  return (
+    <div className="pointer-events-none absolute right-6 top-6 z-20">
+      <div className="pointer-events-auto flex items-center rounded-full border border-surface-border bg-elevated/90 px-2 py-1.5 shadow-lg backdrop-blur-sm">
+        {collaborators.length ? (
+          <div className="flex items-center pr-1">
+            {collaborators.map((collaborator, index) => (
+              <CollaboratorAvatar
+                key={collaborator.id}
+                avatar={collaborator.avatar}
+                color={collaborator.color}
+                index={index}
+                name={collaborator.name}
+              />
+            ))}
+            {overflowCollaboratorCount > 0 ? (
+              <div
+                className="-ml-1.5 flex h-8 w-8 items-center justify-center rounded-full border text-[11px] font-medium text-copy-secondary"
+                style={{ borderColor: "var(--border-subtle)", backgroundColor: "var(--bg-subtle)" }}
+              >
+                +{overflowCollaboratorCount}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {hasCollaborators ? <div className="mx-2 h-6 w-px bg-surface-border" /> : null}
+        <UserButton
+          appearance={{
+            elements: {
+              avatarBox: "h-8 w-8",
+              userButtonPopoverActionButton: "text-copy-primary hover:text-copy-primary",
+              userButtonPopoverActionButtonIcon: "text-copy-secondary",
+              userPreviewMainIdentifierText: "text-copy-primary",
+              userPreviewSecondaryIdentifier: "text-copy-secondary",
+            },
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
+interface CollaboratorAvatarProps {
+  avatar: string | null
+  color: string | null
+  index: number
+  name: string
+}
+
+function CollaboratorAvatar({ avatar, color, index, name }: CollaboratorAvatarProps) {
+  const initials = getInitials(name)
+
+  return (
+    <div
+      className={`relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border bg-subtle text-[11px] font-semibold text-copy-primary ${
+        index > 0 ? "-ml-1.5" : ""
+      }`}
+      style={{
+        borderColor: color || "var(--border-subtle)",
+        boxShadow: "0 0 0 1px var(--bg-base)",
+      }}
+      title={name}
+    >
+      {avatar ? <img alt={name} className="h-full w-full object-cover" src={avatar} /> : initials}
+    </div>
+  )
+}
+
+interface LiveCursorLayerProps {
+  canvasWrapperRef: RefObject<HTMLDivElement | null>
+  cursors: RemoteCursor[]
+  reactFlowInstance: ReactFlowInstance<CanvasNode, CanvasEdge> | null
+}
+
+function LiveCursorLayer({ canvasWrapperRef, cursors, reactFlowInstance }: LiveCursorLayerProps) {
+  const wrapperBounds = canvasWrapperRef.current?.getBoundingClientRect()
+  if (!reactFlowInstance || !wrapperBounds || !cursors.length) {
+    return null
+  }
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20">
+      {cursors.map((cursor) => {
+        const screenPosition = reactFlowInstance.flowToScreenPosition(cursor.position)
+        const x = screenPosition.x - wrapperBounds.left
+        const y = screenPosition.y - wrapperBounds.top
+
+        return (
+          <div
+            key={cursor.id}
+            className="absolute flex items-start gap-1.5"
+            style={{
+              left: x,
+              top: y,
+              transform: "translate(-2px, -2px)",
+            }}
+          >
+            <div
+              className="h-3.5 w-3.5 -rotate-45 rounded-[2px]"
+              style={{ backgroundColor: cursor.color }}
+            />
+            <div
+              className="rounded-md border px-1.5 py-0.5 text-[11px] font-medium text-copy-primary"
+              style={{ borderColor: cursor.color, backgroundColor: "var(--bg-elevated)" }}
+            >
+              {cursor.name}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function getInitials(name: string) {
+  const trimmedName = name.trim()
+  if (!trimmedName) {
+    return "?"
+  }
+
+  const segments = trimmedName.split(/\s+/).slice(0, 2)
+  return segments.map((segment) => segment[0]?.toUpperCase() ?? "").join("")
 }
 
 function CanvasControlBar({
