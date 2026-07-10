@@ -34,7 +34,7 @@ export default async function EditorWorkspacePage({ params }: EditorWorkspacePag
 
   return (
     <div className="flex min-w-0 flex-1 bg-base">
-      <CollaborativeCanvas roomId={project.id} />
+      <CollaborativeCanvas hasSavedCanvas={Boolean(project.canvasJsonPath)} roomId={project.id} />
     </div>
   )
 }

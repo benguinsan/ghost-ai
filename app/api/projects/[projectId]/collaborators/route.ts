@@ -1,5 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server"
 
+import { badRequestResponse, forbiddenResponse, unauthorizedResponse } from "@/lib/api-responses"
 import { getClerkUsersByEmails } from "@/lib/clerk-users"
 import { prisma } from "@/lib/prisma"
 
@@ -17,18 +18,6 @@ interface CollaboratorResponseItem {
   email: string
   name: string | null
   avatarUrl: string | null
-}
-
-function unauthorizedResponse() {
-  return Response.json({ error: "Unauthorized" }, { status: 401 })
-}
-
-function forbiddenResponse() {
-  return Response.json({ error: "Forbidden" }, { status: 403 })
-}
-
-function badRequestResponse(message: string) {
-  return Response.json({ error: message }, { status: 400 })
 }
 
 function normalizeEmail(email: string) {

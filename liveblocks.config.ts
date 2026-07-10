@@ -1,5 +1,7 @@
 // Define Liveblocks types for your application
 // https://liveblocks.io/docs/api-reference/liveblocks-react#Typing-your-data
+import type { AiCanvasState } from "@/types/ai-canvas"
+
 declare global {
   interface Liveblocks {
     // Each user's Presence, for useMyPresence, useOthers, etc.
@@ -12,9 +14,12 @@ declare global {
     };
 
     // The Storage tree for the room, for useMutation, useStorage, etc.
+    // Nodes and edges are managed by `@liveblocks/react-flow` under its own
+    // internal `flow` key. `ai` holds the design agent's on-canvas pointer
+    // (published by the durable background task). Human-readable AI status text
+    // is published to the Liveblocks feed `ai-status-feed`, not Storage.
     Storage: {
-      // Example, a conflict-free list
-      // animals: LiveList<string>;
+      ai?: AiCanvasState;
     };
 
     // Custom user info set when authenticating with a secret key

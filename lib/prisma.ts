@@ -48,8 +48,26 @@ const createPrismaClient = () => {
   });
 };
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+const REQUIRED_PRISMA_DELEGATES = ["project", "projectCollaborator", "projectSpec", "taskRun"] as const;
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+function isPrismaClientReady(client: PrismaClient) {
+  return REQUIRED_PRISMA_DELEGATES.every((delegate) => delegate in client);
 }
+
+function getPrismaClient() {
+  const cachedClient = globalForPrisma.prisma;
+
+  if (cachedClient && isPrismaClientReady(cachedClient)) {
+    return cachedClient;
+  }
+
+  const nextClient = createPrismaClient();
+
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.prisma = nextClient;
+  }
+
+  return nextClient;
+}
+
+export const prisma = getPrismaClient();

@@ -1,22 +1,11 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 
+import { badRequestResponse, forbiddenResponse, unauthorizedResponse } from "@/lib/api-responses";
 import { getAccessibleProjectByRoom } from "@/lib/project-access";
 import { getCursorColorFromUserId, getLiveblocksClient, getLiveblocksSecret } from "@/lib/liveblocks";
 
 interface LiveblocksAuthRequestBody {
   room?: unknown;
-}
-
-function unauthorizedResponse() {
-  return Response.json({ error: "Unauthorized" }, { status: 401 });
-}
-
-function forbiddenResponse() {
-  return Response.json({ error: "Forbidden" }, { status: 403 });
-}
-
-function badRequestResponse(message: string) {
-  return Response.json({ error: message }, { status: 400 });
 }
 
 function serverErrorResponse(message: string) {

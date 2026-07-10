@@ -22,6 +22,8 @@
   --color-copy-faint: var(--text-faint);
   --color-brand: var(--accent-primary);
   --color-accent-dim: var(--accent-primary-dim);
+  --color-accent-green: var(--accent-green);
+  --color-accent-green-dim: var(--accent-green-dim);
   --color-ai: var(--accent-ai);
   --color-ai-text: var(--accent-ai-text);
   --color-state-error: var(--state-error);
@@ -83,6 +85,10 @@
   --color-text-faint: #505060;
   --color-accent-primary: #00c8d4;
   --color-accent-primary-dim: rgba(0, 200, 212, 0.12);
+  /* Green accent for AI chat/design UI. Same hue already used as chart-4 and the
+     canvas "Green" node color — exposed here as a semantic token, not a new color. */
+  --color-accent-green: #62c073;
+  --color-accent-green-dim: rgba(98, 192, 115, 0.14);
   --color-accent-ai: #6457f9;
   --color-accent-ai-text: #8b82ff;
   --color-state-error: #ff4d4f;
@@ -102,6 +108,8 @@
   --text-faint: var(--color-text-faint);
   --accent-primary: var(--color-accent-primary);
   --accent-primary-dim: var(--color-accent-primary-dim);
+  --accent-green: var(--color-accent-green);
+  --accent-green-dim: var(--color-accent-green-dim);
   --accent-ai: var(--color-accent-ai);
   --accent-ai-text: var(--color-accent-ai-text);
   --state-error: var(--color-state-error);
