@@ -1,8 +1,9 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
+import { LiveblocksProvider, RoomProvider } from "@liveblocks/react/suspense"
 
 import { AiSidebar } from "@/components/editor/ai-sidebar"
 import { EditorNavbar } from "@/components/editor/editor-navbar"
@@ -13,6 +14,11 @@ import {
 import { ProjectSidebar } from "@/components/editor/project-sidebar"
 import { ShareDialog } from "@/components/editor/share-dialog"
 import { OPEN_STARTER_TEMPLATES_EVENT } from "@/components/editor/starter-template-events"
+import {
+  CANVAS_SAVE_STATUS_EVENT,
+  type CanvasSaveStatus,
+  type CanvasSaveStatusEventDetail,
+} from "@/components/editor/canvas-save-status-events"
 import type { ProjectListItem } from "@/types/project-list-item"
 
 interface EditorLayoutProps {
@@ -25,14 +31,42 @@ export function EditorLayout({ children, ownedProjects, sharedProjects }: Editor
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false)
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
+  const [canvasSaveStatus, setCanvasSaveStatus] = useState<CanvasSaveStatus | null>(null)
   const pathname = usePathname()
   const activeProjectId = getActiveWorkspaceId(pathname)
   const projectName = getProjectNameById(activeProjectId, [...ownedProjects, ...sharedProjects])
+
+  useEffect(() => {
+    const handleCanvasSaveStatus = (event: Event) => {
+      const customEvent = event as CustomEvent<CanvasSaveStatusEventDetail>
+      if (!customEvent.detail || customEvent.detail.projectId !== activeProjectId) {
+        return
+      }
+
+      setCanvasSaveStatus(customEvent.detail.status)
+    }
+
+    window.addEventListener(CANVAS_SAVE_STATUS_EVENT, handleCanvasSaveStatus)
+
+    return () => {
+      window.removeEventListener(CANVAS_SAVE_STATUS_EVENT, handleCanvasSaveStatus)
+    }
+  }, [activeProjectId])
+
+  useEffect(() => {
+    if (!activeProjectId) {
+      setCanvasSaveStatus(null)
+      return
+    }
+
+    setCanvasSaveStatus("saved")
+  }, [activeProjectId])
 
   return (
     <ProjectDialogStateProvider ownedProjects={ownedProjects} sharedProjects={sharedProjects}>
       <EditorLayoutBody
         activeProjectId={activeProjectId}
+        canvasSaveStatus={canvasSaveStatus}
         isAiSidebarOpen={Boolean(activeProjectId) && isAiSidebarOpen}
         isSidebarOpen={isSidebarOpen}
         isShareDialogOpen={Boolean(activeProjectId) && isShareDialogOpen}
@@ -63,6 +97,7 @@ function getProjectNameById(projectId: string | null, projects: ProjectListItem[
 interface EditorLayoutBodyProps {
   children: ReactNode
   activeProjectId: string | null
+  canvasSaveStatus: CanvasSaveStatus | null
   isAiSidebarOpen: boolean
   isSidebarOpen: boolean
   isShareDialogOpen: boolean
@@ -75,6 +110,7 @@ interface EditorLayoutBodyProps {
 function EditorLayoutBody({
   children,
   activeProjectId,
+  canvasSaveStatus,
   isAiSidebarOpen,
   isSidebarOpen,
   isShareDialogOpen,
@@ -98,6 +134,7 @@ function EditorLayoutBody({
         onToggleAiSidebar={() => setIsAiSidebarOpen((previous) => !previous)}
         onToggleSidebar={() => setIsSidebarOpen((previous) => !previous)}
         projectName={projectName ?? undefined}
+        saveStatus={canvasSaveStatus}
       />
       <ProjectSidebar
         activeProjectId={activeProjectId}
@@ -109,10 +146,24 @@ function EditorLayoutBody({
         ownedProjects={dialogState.ownedProjects}
         sharedProjects={dialogState.sharedProjects}
       />
-      <section className="flex flex-1">
-        <div className="flex min-w-0 flex-1">{children}</div>
-      </section>
-      {activeProjectId ? <AiSidebar isOpen={isAiSidebarOpen} onClose={() => setIsAiSidebarOpen(false)} /> : null}
+      {activeProjectId ? (
+        <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
+          <RoomProvider id={activeProjectId} initialPresence={{ cursor: null, thinking: false }}>
+            <section className="flex flex-1">
+              <div className="flex min-w-0 flex-1">{children}</div>
+            </section>
+            <AiSidebar
+              isOpen={isAiSidebarOpen}
+              onClose={() => setIsAiSidebarOpen(false)}
+              projectId={activeProjectId}
+            />
+          </RoomProvider>
+        </LiveblocksProvider>
+      ) : (
+        <section className="flex flex-1">
+          <div className="flex min-w-0 flex-1">{children}</div>
+        </section>
+      )}
       {activeProjectId && projectName ? (
         <ShareDialog
           isOpen={isShareDialogOpen}

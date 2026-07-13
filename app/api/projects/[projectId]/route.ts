@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 
+import { badRequestResponse, forbiddenResponse, unauthorizedResponse } from "@/lib/api-responses";
 import { prisma } from "@/lib/prisma";
 
 interface ProjectRouteContext {
@@ -10,18 +11,6 @@ interface ProjectRouteContext {
 
 interface RenameProjectRequestBody {
   name?: unknown;
-}
-
-function unauthorizedResponse() {
-  return Response.json({ error: "Unauthorized" }, { status: 401 });
-}
-
-function forbiddenResponse() {
-  return Response.json({ error: "Forbidden" }, { status: 403 });
-}
-
-function badRequestResponse(message: string) {
-  return Response.json({ error: message }, { status: 400 });
 }
 
 export async function PATCH(request: Request, context: ProjectRouteContext) {

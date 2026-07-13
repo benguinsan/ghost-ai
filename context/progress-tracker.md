@@ -23,13 +23,26 @@ Update this file whenever the current phase, active feature, or implementation s
 - Feature 18: Starter Template Library and Import Flow (completed)
 - Feature 19: Presence Avatars and Live Cursor Overlay (completed)
 - Feature 20: AI Sidebar Shell (completed)
+- Feature 21: Canvas Autosave and Persisted Load (completed)
+- Feature 22: Design Agent API (completed)
+- Feature 23: Design Agent Logic (completed)
+- Feature 24: AI Presence State (completed)
+- Feature 25: Sidebar Chat Feed (completed)
+- Feature 26: Design Agent Frontend (completed)
+- Feature 27: Spec Generation Flow (completed)
+- Feature 28: Spec Persistence and Download (completed)
+- Feature 29: Spec UI Integration (completed)
 
 ## Current Goal
 
-- Prepare for the next feature unit after completing the AI sidebar shell.
+- Feature 29 complete. The Specs tab now lists project specs, previews Markdown in a modal, and downloads via the secure API routes. Next unit open.
 
 ## Completed
 
+- Trigger.dev foundation setup (pre-feature bootstrap):
+  - Added `trigger.config.ts` with project reference, retry policy, max duration, and task discovery in top-level `trigger/`.
+  - Added a starter task at `trigger/example.ts` exporting `hello-world` via `task()` from `@trigger.dev/sdk`.
+  - Added Trigger CLI scripts in `package.json`: `trigger:dev` and `trigger:deploy`.
 - `context/feature-specs/01-design-system.md` implemented:
   - `shadcn/ui` initialized and configured.
   - Added `Button`, `Card`, `Dialog`, `Input`, `Tabs`, `Textarea`, and `ScrollArea`.
@@ -158,14 +171,29 @@ Update this file whenever the current phase, active feature, or implementation s
   - Built AI Architect UI shell with scrollable chat area, empty state, starter prompt chips, styled user/assistant message bubbles, auto-resizing textarea, and Enter-to-send behavior (`Shift+Enter` newline).
   - Built Specs tab shell with `Generate Spec` action and a static demo spec card with disabled download button.
   - Wired `components/editor/editor-layout.tsx` to render the new `AiSidebar` component instead of inline placeholder markup.
+- `context/feature-specs/21-canvas-autosave.md` implemented:
+  - Added `app/api/projects/[projectId]/canvas/route.ts` with authenticated `PUT`/`GET` handlers that enforce project membership, upload/download canvas JSON through Vercel Blob, and persist blob URLs on `Project.canvasJsonPath`.
+  - Added `hooks/use-canvas-autosave.ts` with debounced save behavior for canvas nodes/edges and explicit save status states (`saving`, `saved`, `error`).
+  - Added initial canvas load flow in `components/editor/collaborative-canvas.tsx` that hydrates from persisted canvas only when the Liveblocks room starts empty.
+  - Added canvas save status event wiring (`components/editor/canvas-save-status-events.ts`) and integrated a save status indicator button in `components/editor/editor-navbar.tsx`.
+  - Updated `lib/project-access.ts`, `app/editor/[roomId]/page.tsx`, and `components/editor/editor-layout.tsx` to pass saved-canvas metadata and propagate live save status to editor chrome.
+
+- `context/feature-specs/23-design-agent-logic.md` implemented:
+  - Added shared AI presence/status types at `types/ai-canvas.ts` (`AiCanvasState`, `AiCanvasPhase`, activity feed entries) plus constants, and added a `NODE_SHAPES` const tuple to `types/canvas.ts` to align with `ui-context.md`.
+  - Extended the Liveblocks `Storage` type in `liveblocks.config.ts` with an `ai` key so the durable task can publish AI presence + a shared status feed inside Liveblocks Storage (no new state system, no canvas architecture change).
+  - Added `lib/design-agent/plan.ts`: interprets the prompt with Gemini (`@ai-sdk/google` `createGoogleGenerativeAI` + `generateObject`, model `gemini-2.5-flash`, `GEMINI_API_KEY`), and normalizes output to enforce allowed node shapes, the canvas color palette, and deterministic column/row layout + spacing with collision avoidance and validated edges.
+  - Added `lib/design-agent/canvas-writer.ts`: mutates the shared canvas via `mutateFlow` from `@liveblocks/react-flow/node` (reusing the existing collaborative flow storage), and publishes/clears AI presence + status through `mutateStorage` using the existing `lib/liveblocks.ts` node client.
+  - Rewrote `trigger/design-agent.ts` to orchestrate: publish start/thinking → generate plan → progressively add nodes (moving the AI cursor + status per node) → add edges → complete → clear AI presence. Errors update AI status, clear presence, and rethrow. Retries disabled (`maxAttempts: 1`) to keep shared canvas mutations idempotent.
+  - Rendered AI presence in `components/editor/collaborative-canvas.tsx`: reads `root.ai` via `useStorage`, renders a top-center AI status feed (thinking/generating/complete/error) and an on-canvas AI cursor with a thinking indicator, reusing existing presence/cursor patterns.
+  - Wired `components/editor/ai-sidebar.tsx` Send to `POST /api/ai/design` (passing `roomId`/`projectId`), with sending state and error feedback; `components/editor/editor-layout.tsx` now passes the active project id to the sidebar.
 
 ## In Progress
 
-- No active implementation item.
+- None.
 
 ## Next Up
 
-- Start the next feature unit after AI sidebar shell completion.
+- None pending after Feature 29 spec UI integration.
 
 ## Open Questions
 
@@ -177,6 +205,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Session Notes
 
+- Trigger.dev setup note: `src/` and `src/trigger/` are currently owned by `root`, so Trigger task discovery is configured to use top-level `trigger/` instead of `src/trigger/`.
 - Verification complete for design-system unit: `npm run lint` and `npm run build` both pass.
 - Token remap verification re-run after `globals.css` update: `npm run lint` and `npm run build` both pass.
 - Verification complete for editor chrome unit: `npm run lint` and `npm run build` both pass.
@@ -241,3 +270,88 @@ Update this file whenever the current phase, active feature, or implementation s
 - Realtime cursor diagnostics: added development-only debug logs in `components/editor/collaborative-canvas.tsx` (others summary + cursor publish sampling) and `app/api/liveblocks-auth/route.ts` (auth request/room-ready/authorized checkpoints) to isolate multi-user cursor visibility failures.
 - Liveblocks auth route hardening: exempted `/api/liveblocks-auth` from global Clerk middleware protection in `proxy.ts` so unauthenticated/expired sessions receive structured JSON (`401/403`) from the route handler instead of HTML sign-in redirects, reducing websocket auth parsing failures during cursor presence troubleshooting.
 - Diagnostics cleanup: removed temporary `ghost-debug` console logs from cursor/deletion client logic and Liveblocks auth route after troubleshooting to keep runtime output clean.
+- Feature 21 verification complete: `npm run build` passes after adding canvas save/load route, debounced autosave hook, initial saved-canvas load gate, and navbar save-status indicator wiring.
+- Dependency update: added `@vercel/blob` to `package.json` and `package-lock.json` (workspace permissions currently prevent writing new nested modules under `node_modules` during direct `npm install`).
+- Canvas autosave stability fix: hardened `app/api/projects/[projectId]/canvas/route.ts` to handle Blob upload/fetch failures with controlled `502/503` responses and explicit error logs instead of uncaught runtime exceptions.
+- Verification re-run after autosave stability fix: `npm run build` passes.
+- Canvas upload path fix: removed URL encoding of the Blob pathname separator when uploading canvas snapshots (`canvas/<projectId>.json`) so Vercel Blob receives a valid route instead of `canvas%2F...` and no longer fails autosave uploads with gateway errors.
+- Canvas autosave diagnostics update: include Blob upstream response text and preserve client-vs-upstream status distinction (`400` for upstream request issues, `502` for upstream gateway failures) for faster debugging when saves fail.
+- Verification re-run after Blob path + diagnostics fix: `npm run build` passes.
+- Canvas autosave 400 fix: aligned server upload call with Vercel Blob SDK API shape by using `PUT ${VERCEL_BLOB_API_URL}/?pathname=...` and sending upload controls via headers (`x-add-random-suffix`, `x-allow-overwrite`, `x-content-type`) instead of query-style options.
+- Verification re-run after Blob API shape fix: `npm run build` passes.
+- Canvas private-store fix: `app/api/projects/[projectId]/canvas/route.ts` now sets `x-vercel-blob-access: private` for uploads and includes Blob bearer auth on saved-canvas fetches, resolving upstream `400` caused by public-access defaults against a private Blob store.
+- Root-cause clarification: autosave payload state was not null; failures occurred before Prisma update because Blob upload returned `400` and `canvasJsonPath` never persisted.
+- Verification re-run after private-store fix: `npm run build` passes.
+- Blob URL compatibility fix: upload URL construction now switches by endpoint type (`/api/blob` => query `pathname`, production Blob host => path-style upload) to avoid `Invalid pathname` `400` responses.
+- Autosave diagnostics improvement: `hooks/use-canvas-autosave.ts` now throws/logs response body text for failed saves so bad requests are directly inspectable from browser console.
+- Verification re-run after Blob URL compatibility + autosave diagnostics updates: `npm run build` passes.
+- `context/feature-specs/22-design-agent-api.md` implemented:
+  - Added `trigger/design-agent.ts` exporting a minimal `design-agent` task that accepts `{ prompt, roomId }`, logs the input via `logger`, and echoes it back. No AI logic yet, reusing the existing `@trigger.dev/sdk` `task()` setup.
+  - Added `prisma/models/task-run.prisma` `TaskRun` model with unique `runId`, `projectId`, `userId`, `createdAt`, an index on `runId`, and a compound index on `[userId, projectId]`; created/applied migration `20260706181712_add_task_run_model` and regenerated the Prisma client.
+  - Added `app/api/ai/design/route.ts` (`POST`) that authenticates via Clerk, validates `prompt`/`roomId`/`projectId`, verifies project access via `getAccessibleProjectByRoom`, triggers the `design-agent` task with `tasks.trigger`, persists a `TaskRun` record, and returns `{ runId }`.
+  - Added `app/api/ai/design/token/route.ts` (`POST`) that authenticates via Clerk, verifies ownership through the `TaskRun` record, and returns a run-scoped Trigger.dev public token via `auth.createPublicToken` (`read.runs` scope, 1h expiry).
+- Feature 22 verification complete: `npx prisma migrate dev`, `npx prisma generate`, and `npm run build` pass; new routes `/api/ai/design` and `/api/ai/design/token` are registered.
+- Refactor: extracted the duplicated API response helpers (`unauthorizedResponse`, `forbiddenResponse`, `badRequestResponse`) into shared `lib/api-responses.ts` and imported them across all 7 route handlers (`ai/design`, `ai/design/token`, `projects`, `projects/[projectId]`, `projects/[projectId]/collaborators`, `projects/[projectId]/canvas`, `liveblocks-auth`). Route-specific helpers (`serverErrorResponse` in liveblocks-auth, `missingBlobConfigResponse` in canvas) were kept local. `npm run build` passes.
+- Feature 23 architecture decision: AI presence + status feed are stored in Liveblocks Storage (root key `ai`) rather than per-connection Presence, because the design agent runs as a durable Trigger.dev task without a live Liveblocks connection. This keeps all AI state inside Liveblocks and visible to every participant via `useStorage`.
+- Feature 23 architecture decision: server-side canvas mutation goes through `mutateFlow` (`@liveblocks/react-flow/node`), which shares the exact `flow` storage layout used by the client `useLiveblocksFlow`, so generated nodes/edges flow through the existing collaborative pipeline without bypassing it.
+- Feature 23 note: design-agent runtime relies on a Gemini API key and `LIVEBLOCKS_SECRET_KEY` being present in the Trigger.dev task environment; both must be provisioned there (in addition to `.env.local`) for deployed runs. The Gemini key is read from any of `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, or `GOOGLE_AI_API_KEY` (the value currently in `.env.local` is named `GOOGLE_AI_API_KEY`).
+- Feature 23 verification complete: `npm run build` passes (Next TypeScript + build).
+- `context/feature-specs/24-ai-presence-state.md` implemented:
+  - Added `types/tasks.ts` with the shared feed identifier `AI_STATUS_FEED_ID = "ai-status-feed"`, a Zod payload schema (`aiStatusFeedMessageSchema` with an optional `text`), and `parseAiStatusFeedMessage()` used to validate incoming feed messages before display. Kept generic so design and (future) spec generation can both publish status.
+  - Migrated the AI status **text** onto a Liveblocks feed (`ai-status-feed`) instead of Liveblocks Storage, following the spec's "reuse Liveblocks feeds/presence instead of creating parallel realtime state." `types/ai-canvas.ts` `AiCanvasState` was trimmed to on-canvas AI cursor presence only (`active`, `phase`, `cursor`, `updatedAt`); `message`/`activity` were removed.
+  - Refactored `lib/design-agent/canvas-writer.ts`: `setAiPresence` (Storage cursor/phase/active), `clearAiPresence` (reset Storage), `ensureAiStatusFeed` (create-or-reuse feed via `@liveblocks/node` `createFeed`), and `publishAiStatusMessage` (writes `{ text }` to the feed via `createFeedMessage`). `addCanvasNode`/`addCanvasEdges` unchanged.
+  - Updated `trigger/design-agent.ts` to ensure the feed once, publish human-readable status to the feed at key steps, and drive the on-canvas AI cursor via `setAiPresence` per node.
+  - Lifted the Liveblocks `LiveblocksProvider` + `RoomProvider` from `collaborative-canvas.tsx` into `editor-layout.tsx` so both the canvas and the AI sidebar share one room connection; `CollaborativeCanvas` now assumes the ambient room provider (keeps its error boundary + suspense).
+  - `components/editor/ai-sidebar.tsx` now: ensures the feed (`useCreateFeed`), subscribes to the latest validated `ai-status-feed` message (`useFeedMessages`), reads shared generation-active state from Storage `ai.active` (`useStorage`), reflects `thinking` into the sender's presence (`useUpdateMyPresence`), shows a small status indicator, disables the input, and shows a loading Send button while generation is active — while keeping the rest of the sidebar usable.
+  - `components/editor/collaborative-canvas.tsx` now renders a thinking spinner in a live cursor's name badge when that participant's presence has `thinking: true`, and removed the Storage-based top-center status feed (status text now lives on the feed / sidebar); the on-canvas AI presence cursor is retained.
+- Feature 24 architecture decision: AI status **text** is a Liveblocks feed (`ai-status-feed`), participant "working" state is Liveblocks Presence (`thinking`), and only the on-canvas AI pointer remains in Storage (`ai`). This consolidates realtime status onto Liveblocks-native feeds/presence rather than a parallel Storage channel.
+- Feature 24 architecture decision: the Liveblocks room provider is owned by `editor-layout.tsx` (keyed by the active project/room id) so non-canvas chrome (AI sidebar) can use room hooks (`useFeedMessages`, `useUpdateMyPresence`, `useStorage`).
+- Feature 24 verification complete: `npm run build` passes.
+- `context/feature-specs/25-sidebar-chat-feed.md` implemented:
+  - Added a dedicated, room-scoped Liveblocks `ai-chat` feed for collaborative room chat, kept fully separate from `ai-status-feed`. New shared identifier `AI_CHAT_FEED_ID = "ai-chat"` in `types/tasks.ts`.
+  - Added a Zod chat message schema in `types/tasks.ts` (`aiChatMessageSchema`: `sender`, `role` (`user`/`assistant`), `content`, `timestamp`) plus `parseAiChatMessage()`; every feed message is validated before rendering. Sender is embedded in the payload because Liveblocks `FeedMessage` only carries `id`/`createdAt`/`data`.
+  - Reworked `components/editor/ai-sidebar.tsx` "Room Chat" tab to subscribe to `ai-chat` via `useFeedMessages`, render validated messages oldest-first with sender name, timestamp, and content (own messages right-aligned via sender-name match on `useSelf().info.name`), ensure the feed exists via `useCreateFeed`, and auto-scroll to newest.
+  - Rewired the existing sidebar input/send button to post chat messages to `ai-chat` via `useCreateFeedMessage` (clears the input on success, shows an inline destructive error banner on failure). Send button shows a sending spinner.
+  - Kept the `ai-status-feed` "AI is working" indicator as a separate, read-only banner (driven by Storage `ai.active` + latest validated `ai-status-feed` text) so chat and status never mix.
+- Feature 25 architecture decision (scope): per the spec Scope Limits ("don't trigger backend AI tasks", "keep this focused on collaborative sidebar chat only"), the sidebar send button now posts collaborative chat to `ai-chat` and no longer triggers the `design-agent` task. The design-agent backend (`app/api/ai/design`, `app/api/ai/design/token`, `trigger/design-agent.ts`, `lib/design-agent/*`) is left fully intact and can be re-wired to a dedicated control in a later feature.
+- Feature 25 architecture decision: chat sender identity is embedded in the feed message `data.sender` (display name from Liveblocks `UserMeta.info.name`), since Liveblocks feed messages do not carry an author field; own-vs-other alignment compares this name against the current user.
+- Feature 25 verification complete: `npm run build` passes.
+- `context/feature-specs/26-design-agent-frontend.md` implemented:
+  - Rewired the AI sidebar "AI Architect" tab so submitting a prompt pushes the user message to the `ai-chat` feed, calls `POST /api/ai/design` with `{ prompt, roomId, projectId }`, and reads `{ runId, publicToken }` from the response.
+  - Added a `DesignRunTracker` child component in `components/editor/ai-sidebar.tsx` that mounts only while a run is active and subscribes via `useRealtimeRun<typeof designAgentTask>(runId, { accessToken })`; on `onComplete`/subscription error it posts a final `Ghost AI` assistant message to `ai-chat` and resets local run state.
+  - Combined run-active state as `activeRun !== null || Storage ai.active` so both the initiating client and every other participant disable the input and show the compact status strip while generation runs; the strip renders the latest validated `ai-status-feed` text.
+  - Canvas updates are left entirely to Liveblocks (`useLiveblocksFlow`) — the frontend never manually mutates nodes/edges. Errors are surfaced as `ai-chat` messages (with an inline banner only as a fallback if the feed post itself fails).
+  - Restyled chat bubbles per spec: user messages use the green accent background with dark readable text, assistant/AI messages use a dark surface with light text; the Send button uses the green accent and shows a spinner while working.
+  - Updated `app/api/ai/design/route.ts` to also create a run-scoped Trigger.dev public token (`auth.createPublicToken`, `read.runs`, 1h) and return `{ runId, publicToken }` so the client can subscribe in a single request.
+  - Added semantic `--accent-green` / `--accent-green-dim` tokens in `app/globals.css` (mapped to Tailwind `accent-green` utilities). The hue `#62c073` already existed in the theme (chart-4 / canvas "Green" node color), so this exposes an existing color as a token rather than introducing a new one.
+- Feature 26 architecture decision: `POST /api/ai/design` now returns both `runId` and a run-scoped `publicToken` in one response (matching the spec's `{ runId, publicToken }` contract). The standalone `POST /api/ai/design/token` route is retained for potential token refresh.
+- Feature 26 architecture decision: `useRealtimeRun` is isolated in a `DesignRunTracker` component mounted only for the duration of an active run, so the subscription hook is never called with a null run id and cleans up automatically on completion.
+- Feature 26 scope note: this re-wires the sidebar Send action to trigger the `design-agent` task (Feature 25 had temporarily left it as chat-only, noting it would be re-wired in a later feature). The tab label is "AI Architect" to reflect the AI design purpose.
+- Feature 26 verification complete: `npm run build` passes (TypeScript + build).
+- Feature 26 runtime fix (502): the long-running Next.js dev server predated the `.env.local` update that added `TRIGGER_SECRET_KEY`, so `tasks.trigger` threw and `/api/ai/design` returned 502. Fixed by restarting the dev server; also updated the route catch to include the underlying error `detail` in the 502 body for easier diagnosis.
+- Feature 26 runtime fix (schema): the design-agent's Gemini `generateObject` failed with "response did not match schema" because `lib/design-agent/plan.ts` used strict `z.enum` for node `shape`/`color`. Relaxed the plan schema to permissive strings (shape/color/label/title/summary optional with defaults, `column`/`row` coerced numbers), since `normalizeDesignPlan` already maps freeform values onto the approved shapes/palette. `npm run build` passes.
+- `context/feature-specs/27-spec-generation-flow.md` implemented (backend):
+  - Added `lib/spec-agent/generate.ts`: permissive Zod input schema (`generateSpecInputSchema` for `projectId`/`roomId`/`projectName`/`chatHistory`/`nodes`/`edges`) plus `generateSpecMarkdown()`, which renders the canvas graph + chat context into a grounded prompt and calls Gemini via `@ai-sdk/google` (`gemini-2.5-flash`, `generateText`) to produce a Markdown spec. Reuses the existing multi-key Gemini env resolution — no new AI provider abstraction.
+  - Added `trigger/generate-spec.ts`: `generateSpecTask` (`id: "generate-spec"`, `maxAttempts: 1`) that validates the payload with the shared Zod schema, updates run metadata/status (`metadata.set` for `status`/`message`) for realtime tracking, logs via `logger`, generates the Markdown spec, and returns `{ projectId, roomId, spec }`. Errors set an error status and rethrow, mirroring the design-agent task's error handling.
+  - Added `app/api/ai/spec/route.ts` (`POST`): authenticates via Clerk, validates `roomId`/`chatHistory`/`nodes`/`edges`, resolves project access strictly from the authenticated user + `roomId` via `getAccessibleProjectByRoom` (never a client `projectId`), triggers `generate-spec` with the server-resolved `project.id`, persists a `TaskRun`, and returns `{ runId }`.
+  - Added `app/api/ai/spec/token/route.ts` (`POST`): authenticates via Clerk, verifies the `TaskRun` belongs to the caller, and returns a run-scoped Trigger.dev public token (`read.runs`, 1h expiry). Mirrors the design token route.
+- Feature 27 architecture decision: spec generation reuses the design-agent's proven backend shape (permissive Zod validation + Gemini + Trigger.dev task + `TaskRun` ownership + run-scoped public token) rather than introducing a new abstraction. Realtime progress is exposed through Trigger.dev run metadata (`useRealtimeRun`-friendly) instead of Liveblocks, since the spec output is returned to the requester rather than written to the shared canvas.
+- Feature 27 scope note: this unit is backend-only — no frontend/spec-editor UI, and the generated spec is returned as task output (plain Markdown) but not yet persisted; persistence + UI are deferred to a later feature per the spec's Scope Limits.
+- Feature 27 verification complete: `npm run build` passes (TypeScript + build); routes `/api/ai/spec` and `/api/ai/spec/token` are registered.
+- `context/feature-specs/28-spec-persistence-dowload.md` implemented:
+  - Added `prisma/models/spec.prisma` `ProjectSpec` model (`id`, `projectId`, `filePath`, `createdAt`, project relation `onDelete: Cascade`, index on `[projectId, createdAt]`) and a `specs ProjectSpec[]` back-relation on `Project`. Metadata only — no spec content in Prisma. Created/applied migration `20260708101454_add_project_spec_model` and regenerated the client.
+  - Added `lib/spec-agent/persist.ts`: `persistGeneratedSpec()` uploads the Markdown to Vercel Blob at `specs/{projectId}/{specId}.md` (private access, `text/markdown`) and creates a `ProjectSpec` row storing only the returned Blob URL in `filePath`. Replicates the canvas blob upload pattern (env vars, headers, path/query URL switching) without modifying `app/api/projects/[projectId]/canvas/route.ts`.
+  - Wired persistence into `trigger/generate-spec.ts`: after generation it sets a `saving` status, calls `persistGeneratedSpec`, logs the spec id, and now returns `{ projectId, roomId, specId, spec }`.
+  - Added `app/api/projects/[projectId]/specs/[specId]/download/route.ts` (`GET`): authenticates via Clerk, resolves project access via `getAccessibleProjectByRoom` (project id == room id), verifies the `ProjectSpec` belongs to that project (`404` otherwise), fetches the artifact from `filePath` with the Blob bearer token, and returns it as a Markdown attachment (`Content-Disposition: attachment; filename="{specId}.md"`). Fetch failures return `502`.
+- Feature 28 architecture decision: the spec id is generated (`crypto.randomUUID`) before upload so the Blob path (`specs/{projectId}/{specId}.md`) and the `ProjectSpec.id` match, and the record is created in one write with the final Blob URL.
+- Feature 28 scope note: backend-only per the spec Scope Limits — no frontend/UI, spec content lives only in Vercel Blob (Prisma stores just the URL), Blob URLs are never returned without owner/collaborator access checks, and canvas persistence was left untouched (blob logic replicated in a separate spec helper).
+- Feature 28 verification complete: `npx prisma migrate dev` + `npx prisma generate` and `npm run build` pass (TypeScript + build); route `/api/projects/[projectId]/specs/[specId]/download` is registered.
+- `context/feature-specs/29-spec-ui-integration.md` implemented:
+  - Added `app/api/projects/[projectId]/specs/route.ts` (`GET`) returning the project's specs (id, createdAt, filename = `{id}.md`) from the `ProjectSpec` API, enforcing Clerk auth + owner/collaborator access via `getAccessibleProjectByRoom`.
+  - Added `app/api/projects/[projectId]/specs/[specId]/route.ts` (`GET`) returning spec Markdown content as JSON (`id`, `createdAt`, `filename`, `markdown`) fetched from Vercel Blob through the same access checks — the client never reads Blob directly.
+  - Added `lib/spec-api.ts` with `listProjectSpecs()`, `getProjectSpecContent()`, and `getProjectSpecDownloadUrl()` fetch helpers that degrade gracefully (empty list / null on failure).
+  - Added `components/editor/markdown-preview.tsx` for lightweight Markdown rendering in the preview modal (headings, lists, code blocks, inline emphasis/links) without a new dependency.
+  - Added `components/editor/specs-tab.tsx` rendering a compact, scrollable spec list (createdAt + filename) with inline download + click-to-open, a `Dialog` preview modal that fetches and renders Markdown via the content endpoint, and a download action in the modal. Keyboard support (Esc / outside-click close) and `ScrollArea`/`Button`/`Dialog` come from the existing shadcn set; styling uses token-based classes only. Preview content is cleared when the modal closes.
+  - Wired `SpecsTab` into `components/editor/ai-sidebar.tsx`, replacing the static demo spec card; removed now-unused `Download`/`FileText` imports from the sidebar.
+- Feature 29 architecture decision: spec content is returned by a dedicated content endpoint (not the download route) so the preview modal can render Markdown while the download control still uses the existing `…/download` route per the spec's "do not fetch Blob URLs directly in the client" rule.
+- Feature 29 verification complete: `npm run build` passes and both new routes (`/api/projects/[projectId]/specs`, `/api/projects/[projectId]/specs/[specId]`) are registered.

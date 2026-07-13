@@ -16,14 +16,16 @@ import {
   useState,
 } from "react"
 import { UserButton, useAuth } from "@clerk/nextjs"
-import { ClientSideSuspense, LiveblocksProvider, RoomProvider } from "@liveblocks/react/suspense"
-import { useCanRedo, useCanUndo, useHistory, useMyPresence, useOthers } from "@liveblocks/react/suspense"
+import { ClientSideSuspense } from "@liveblocks/react/suspense"
+import { useCanRedo, useCanUndo, useHistory, useMyPresence, useOthers, useStorage } from "@liveblocks/react/suspense"
 import { useLiveblocksFlow } from "@liveblocks/react-flow"
 import {
+  Bot,
   Circle,
   Cylinder,
   Diamond,
   Hexagon,
+  Loader2,
   Minus,
   Pill,
   Plus,
@@ -64,15 +66,23 @@ import {
   type CanvasNodeSize,
 } from "@/types/canvas"
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
+import { useCanvasAutosave } from "@/hooks/use-canvas-autosave"
+import {
+  AI_PRESENCE_COLOR,
+  AI_PRESENCE_NAME,
+  type AiCanvasPhase,
+} from "@/types/ai-canvas"
 import { OPEN_STARTER_TEMPLATES_EVENT } from "@/components/editor/starter-template-events"
 import { StarterTemplatesModal } from "@/components/editor/starter-templates-modal"
 import { CANVAS_TEMPLATES, type CanvasTemplate } from "@/components/editor/starter-templates"
+import { emitCanvasSaveStatus } from "@/components/editor/canvas-save-status-events"
 
 import "@xyflow/react/dist/style.css"
 import "@liveblocks/react-flow/styles.css"
 
 interface CollaborativeCanvasProps {
   roomId: string
+  hasSavedCanvas: boolean
 }
 
 interface CanvasConnectionErrorBoundaryProps {
@@ -122,6 +132,7 @@ interface RemoteCursor {
     x: number
     y: number
   }
+  thinking: boolean
 }
 
 const SHAPE_TOOLBAR_ITEMS: ShapeToolbarItem[] = [
@@ -133,18 +144,17 @@ const SHAPE_TOOLBAR_ITEMS: ShapeToolbarItem[] = [
   { shape: "hexagon", label: "Hexagon", icon: Hexagon },
 ]
 
-export function CollaborativeCanvas({ roomId }: CollaborativeCanvasProps) {
+export function CollaborativeCanvas({ roomId, hasSavedCanvas }: CollaborativeCanvasProps) {
+  // The Liveblocks `LiveblocksProvider` + `RoomProvider` are owned by
+  // `editor-layout.tsx` so both the canvas and the AI sidebar share one room
+  // connection. This component assumes it renders inside that room provider.
   return (
     <div className="flex min-w-0 flex-1">
-      <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
-        <RoomProvider id={roomId} initialPresence={{ cursor: null, thinking: false }}>
-          <CanvasConnectionErrorBoundary resetKey={roomId}>
-            <ClientSideSuspense fallback={<CanvasLoadingState />}>
-              <LiveblocksReactFlowCanvas />
-            </ClientSideSuspense>
-          </CanvasConnectionErrorBoundary>
-        </RoomProvider>
-      </LiveblocksProvider>
+      <CanvasConnectionErrorBoundary resetKey={roomId}>
+        <ClientSideSuspense fallback={<CanvasLoadingState />}>
+          <LiveblocksReactFlowCanvas hasSavedCanvas={hasSavedCanvas} projectId={roomId} />
+        </ClientSideSuspense>
+      </CanvasConnectionErrorBoundary>
     </div>
   )
 }
@@ -209,7 +219,12 @@ function CanvasLoadingState() {
   )
 }
 
-function LiveblocksReactFlowCanvas() {
+interface LiveblocksReactFlowCanvasProps {
+  projectId: string
+  hasSavedCanvas: boolean
+}
+
+function LiveblocksReactFlowCanvas({ projectId, hasSavedCanvas }: LiveblocksReactFlowCanvasProps) {
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onDelete } = useLiveblocksFlow({
     suspense: true,
     nodes: {
@@ -224,6 +239,7 @@ function LiveblocksReactFlowCanvas() {
   )
   const { userId } = useAuth()
   const others = useOthers()
+  const aiState = useStorage((root) => root.ai ?? null)
   const [, updateMyPresence] = useMyPresence()
   const history = useHistory()
   const canUndo = useCanUndo()
@@ -241,6 +257,14 @@ function LiveblocksReactFlowCanvas() {
   const edgesRef = useRef(edges)
   const selectedNodeIdsRef = useRef<Set<string>>(new Set())
   const selectedEdgeIdsRef = useRef<Set<string>>(new Set())
+  const [isInitialCanvasResolved, setIsInitialCanvasResolved] = useState(false)
+
+  const saveStatus = useCanvasAutosave({
+    projectId,
+    nodes,
+    edges,
+    enabled: isInitialCanvasResolved,
+  })
 
   const collaborators = useMemo<CollaboratorPresence[]>(() => {
     const mappedCollaborators = new Map<string, CollaboratorPresence>()
@@ -271,6 +295,7 @@ function LiveblocksReactFlowCanvas() {
         id: other.connectionId,
         name: other.info.name || "Collaborator",
         position: other.presence.cursor,
+        thinking: other.presence.thinking === true,
       })
 
       return mappedCursors
@@ -290,6 +315,94 @@ function LiveblocksReactFlowCanvas() {
   useEffect(() => {
     edgesRef.current = edges
   }, [edges])
+
+  useEffect(() => {
+    emitCanvasSaveStatus({
+      projectId,
+      status: saveStatus,
+    })
+  }, [projectId, saveStatus])
+
+  useEffect(() => {
+    if (isInitialCanvasResolved) {
+      return
+    }
+
+    if (nodes.length > 0 || edges.length > 0) {
+      setIsInitialCanvasResolved(true)
+      return
+    }
+
+    if (!hasSavedCanvas) {
+      setIsInitialCanvasResolved(true)
+      return
+    }
+
+    let shouldIgnore = false
+
+    const loadSavedCanvas = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/canvas`, {
+          cache: "no-store",
+        })
+
+        if (response.status === 404) {
+          return
+        }
+
+        if (!response.ok) {
+          throw new Error(`Failed to load saved canvas. Status: ${response.status}`)
+        }
+
+        const payload = (await response.json().catch(() => ({}))) as {
+          canvas?: {
+            nodes?: CanvasNode[]
+            edges?: CanvasEdge[]
+          }
+        }
+        const loadedNodes = Array.isArray(payload.canvas?.nodes) ? payload.canvas.nodes : []
+        const loadedEdges = Array.isArray(payload.canvas?.edges) ? payload.canvas.edges : []
+
+        if (shouldIgnore) {
+          return
+        }
+
+        if (nodesRef.current.length > 0 || edgesRef.current.length > 0) {
+          return
+        }
+
+        if (loadedNodes.length > 0) {
+          onNodesChange(loadedNodes.map((node) => ({ item: node, type: "add" as const })))
+        }
+
+        if (loadedEdges.length > 0) {
+          onEdgesChange(
+            loadedEdges.map((edge) => ({
+              item: {
+                ...edge,
+                data: {
+                  label: edge.data?.label ?? "",
+                },
+              },
+              type: "add" as const,
+            })),
+          )
+        }
+      } catch (error) {
+        console.error("Failed to load saved canvas state.", error)
+      } finally {
+        if (!shouldIgnore) {
+          setIsInitialCanvasResolved(true)
+        }
+      }
+    }
+
+    void loadSavedCanvas()
+
+    return () => {
+      shouldIgnore = true
+    }
+  }, [edges.length, hasSavedCanvas, isInitialCanvasResolved, nodes.length, onEdgesChange, onNodesChange, projectId])
 
   useEffect(() => {
     const handleOpenStarterTemplates = () => {
@@ -792,6 +905,11 @@ function LiveblocksReactFlowCanvas() {
         overflowCollaboratorCount={overflowCollaboratorCount}
       />
       <LiveCursorLayer canvasWrapperRef={canvasWrapperRef} cursors={remoteCursors} reactFlowInstance={reactFlowInstance} />
+      <AiPresenceCursor
+        aiState={aiState}
+        canvasWrapperRef={canvasWrapperRef}
+        reactFlowInstance={reactFlowInstance}
+      />
       <CanvasControlBar
         canRedo={canRedo}
         canUndo={canUndo}
@@ -939,14 +1057,63 @@ function LiveCursorLayer({ canvasWrapperRef, cursors, reactFlowInstance }: LiveC
               style={{ backgroundColor: cursor.color }}
             />
             <div
-              className="rounded-md border px-1.5 py-0.5 text-[11px] font-medium text-copy-primary"
+              className="flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium text-copy-primary"
               style={{ borderColor: cursor.color, backgroundColor: "var(--bg-elevated)" }}
             >
-              {cursor.name}
+              <span>{cursor.name}</span>
+              {cursor.thinking ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
             </div>
           </div>
         )
       })}
+    </div>
+  )
+}
+
+type ImmutableAiState = {
+  readonly active: boolean
+  readonly phase: AiCanvasPhase
+  readonly cursor: { readonly x: number; readonly y: number } | null
+  readonly updatedAt: number
+}
+
+interface AiPresenceCursorProps {
+  aiState: ImmutableAiState | null
+  canvasWrapperRef: RefObject<HTMLDivElement | null>
+  reactFlowInstance: ReactFlowInstance<CanvasNode, CanvasEdge> | null
+}
+
+function AiPresenceCursor({ aiState, canvasWrapperRef, reactFlowInstance }: AiPresenceCursorProps) {
+  const wrapperBounds = canvasWrapperRef.current?.getBoundingClientRect()
+
+  if (!aiState?.active || !aiState.cursor || !reactFlowInstance || !wrapperBounds) {
+    return null
+  }
+
+  const screenPosition = reactFlowInstance.flowToScreenPosition({
+    x: aiState.cursor.x,
+    y: aiState.cursor.y,
+  })
+  const x = screenPosition.x - wrapperBounds.left
+  const y = screenPosition.y - wrapperBounds.top
+  const isThinking = aiState.phase === "thinking" || aiState.phase === "generating"
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20">
+      <div
+        className="absolute flex items-start gap-1.5 transition-[left,top] duration-500 ease-out"
+        style={{ left: x, top: y, transform: "translate(-2px, -2px)" }}
+      >
+        <div className="h-3.5 w-3.5 -rotate-45 rounded-[2px]" style={{ backgroundColor: AI_PRESENCE_COLOR }} />
+        <div
+          className="flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium"
+          style={{ borderColor: AI_PRESENCE_COLOR, backgroundColor: "var(--bg-elevated)", color: "var(--accent-ai-text)" }}
+        >
+          <Bot className="h-3 w-3" />
+          <span>{AI_PRESENCE_NAME}</span>
+          {isThinking ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+        </div>
+      </div>
     </div>
   )
 }

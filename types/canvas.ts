@@ -1,12 +1,15 @@
 import type { Edge, Node } from "@xyflow/react"
 
-export type CanvasNodeShape =
-  | "rectangle"
-  | "diamond"
-  | "circle"
-  | "pill"
-  | "cylinder"
-  | "hexagon"
+export const NODE_SHAPES = [
+  "rectangle",
+  "diamond",
+  "circle",
+  "pill",
+  "cylinder",
+  "hexagon",
+] as const
+
+export type CanvasNodeShape = (typeof NODE_SHAPES)[number]
 
 export interface CanvasNodeData {
   label: string

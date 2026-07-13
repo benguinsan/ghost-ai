@@ -1,9 +1,10 @@
 "use client";
 
-import { Bot, LayoutTemplate, PanelLeftClose, PanelLeftOpen, Share2 } from "lucide-react";
+import { AlertCircle, Bot, CheckCircle2, LayoutTemplate, Loader2, PanelLeftClose, PanelLeftOpen, Share2 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 
 import { Button } from "@/components/ui/button";
+import type { CanvasSaveStatus } from "@/components/editor/canvas-save-status-events";
 
 interface EditorNavbarProps {
   isSidebarOpen: boolean;
@@ -13,6 +14,7 @@ interface EditorNavbarProps {
   onOpenStarterTemplates?: () => void;
   isAiSidebarOpen?: boolean;
   onToggleAiSidebar?: () => void;
+  saveStatus?: CanvasSaveStatus | null;
 }
 
 export function EditorNavbar({
@@ -23,6 +25,7 @@ export function EditorNavbar({
   onOpenStarterTemplates,
   isAiSidebarOpen = false,
   onToggleAiSidebar,
+  saveStatus,
 }: EditorNavbarProps) {
   const SidebarIcon = isSidebarOpen ? PanelLeftClose : PanelLeftOpen;
   const showWorkspaceActions = Boolean(projectName);
@@ -48,6 +51,7 @@ export function EditorNavbar({
         <div className="flex flex-1 items-center justify-end">
           {showWorkspaceActions ? (
             <div className="mr-2 flex items-center gap-2">
+              <SaveStatusButton status={saveStatus ?? "saved"} />
               <Button onClick={onOpenStarterTemplates} type="button" variant="outline">
                 <LayoutTemplate className="h-4 w-4" />
                 Templates
@@ -76,5 +80,36 @@ export function EditorNavbar({
         </div>
       </div>
     </header>
+  );
+}
+
+interface SaveStatusButtonProps {
+  status: CanvasSaveStatus;
+}
+
+function SaveStatusButton({ status }: SaveStatusButtonProps) {
+  if (status === "saving") {
+    return (
+      <Button type="button" variant="outline">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Saving
+      </Button>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <Button type="button" variant="outline">
+        <AlertCircle className="h-4 w-4 text-state-error" />
+        Save error
+      </Button>
+    );
+  }
+
+  return (
+    <Button type="button" variant="outline">
+      <CheckCircle2 className="h-4 w-4 text-state-success" />
+      Saved
+    </Button>
   );
 }

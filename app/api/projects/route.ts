@@ -1,19 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 
+import { badRequestResponse, unauthorizedResponse } from "@/lib/api-responses";
 import { prisma } from "@/lib/prisma";
 
 interface CreateProjectRequestBody {
   name?: unknown;
   description?: unknown;
   roomId?: unknown;
-}
-
-function unauthorizedResponse() {
-  return Response.json({ error: "Unauthorized" }, { status: 401 });
-}
-
-function badRequestResponse(message: string) {
-  return Response.json({ error: message }, { status: 400 });
 }
 
 export async function GET() {
